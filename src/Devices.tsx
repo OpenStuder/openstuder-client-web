@@ -47,6 +47,40 @@ class Devices{
             this.devices=[];
         }
     }
+
+    public findDevice(id:number):Device|undefined{
+        this.devices.map(device=>{
+           if(id===device.id){
+               return device;
+           }
+        });
+        return undefined;
+    }
+
+    public hasDevice(id:number):boolean{
+        if(this.findDevice(id)!==undefined){
+            return true;
+        }
+        return false;
+    }
+    public findProperty(idDevice:number, idProperty:number):DeviceProperty|undefined{
+        let device = this.findDevice(idDevice);
+        if(device!==undefined){
+            device.properties.map(property=>{
+                if(property.id===idProperty){
+                    return property;
+                }
+            });
+        }
+        return undefined;
+    }
+
+    public hasProperty(idDevice:number, idProperty:number):boolean{
+        if(this.findProperty(idDevice,idProperty)!==undefined){
+            return true;
+        }
+        return false;
+    }
 }
 
 export default Devices;
