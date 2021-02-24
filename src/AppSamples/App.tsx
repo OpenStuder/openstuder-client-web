@@ -3,7 +3,7 @@ import './App.css';
 
 import logo from "./logo-studer.png"
 
-import {OpenStuderInterface, SIConnectionState, SIDeviceMessage, SIGatewayClient} from "../OpenStuder/OpenStuder";
+import {OpenStuderInterface, SIConnectionState, SIMessage, SIGatewayClient} from "../OpenStuder/OpenStuder";
 
 let oui;
 
@@ -48,43 +48,49 @@ class App extends React.Component<{ }, AppState> implements OpenStuderInterface{
         }
     }
 
-    onDatalogReadCallback(deviceMessage: SIDeviceMessage): void {
+    onDatalogRead(deviceMessage: SIMessage): void {
     }
 
-    onDescriptionCallback(deviceMessage: SIDeviceMessage): void {
+    onDescription(deviceMessage: SIMessage): void {
     }
 
-    onDeviceMessageCallback(deviceMessage: SIDeviceMessage): void {
+    onDeviceMessage(deviceMessage: SIMessage): void {
     }
 
-    onEnumerateCallback(deviceMessage: SIDeviceMessage): void {
+    onEnumerate(deviceMessage: SIMessage): void {
         if(deviceMessage.deviceCount) {
             this.setState({testEnumerate: deviceMessage.deviceCount});
         }
     }
 
-    onErrorCallback(deviceMessage: SIDeviceMessage): void {
+    onError(reason:string): void {
     }
 
-    onMessageReadCallback(devicesMessage: SIDeviceMessage[]): void {
+    onMessageRead(devicesMessage: SIMessage[]): void {
     }
 
-    onPropertyReadCallback(deviceMessage: SIDeviceMessage): void {
+    onPropertyRead(deviceMessage: SIMessage): void {
         if(deviceMessage.value) {
             this.setState({testRead: deviceMessage.value});
         }
     }
 
-    onPropertySubscribeCallback(deviceMessage: SIDeviceMessage): void {
+    onPropertySubscribed(deviceMessage: SIMessage): void {
     }
 
-    onPropertyUnsubscribeCallback(deviceMessage: SIDeviceMessage): void {
+    onPropertyUnsubscribed(deviceMessage: SIMessage): void {
     }
 
-    onPropertyUpdateCallback(deviceMessage: SIDeviceMessage): void {
+    onPropertyUpdate(deviceMessage: SIMessage): void {
     }
 
-    onPropertyWrittenCallback(deviceMessage: SIDeviceMessage): void {
+    onPropertyWritten(deviceMessage: SIMessage): void {
+    }
+
+    onConnect(deviceMessage: SIMessage):void {
+    }
+
+    onDisconnected():void {
     }
 }
 
