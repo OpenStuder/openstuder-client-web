@@ -479,6 +479,7 @@ class SIAbstractGatewayClient {
             && decodedFrame.headers.has("id")) {
             retVal.status=decodedFrame.headers.get("status");
             retVal.id=decodedFrame.headers.get("id");
+			retVal.value=decodedFrame.headers.get("value");
         } else if (decodedFrame.command === "ERROR") {
             SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
         } else {
@@ -499,7 +500,7 @@ class SIAbstractGatewayClient {
         frame += SIAbstractGatewayClient.getTimestampHeader('from',dateFrom);
         frame += SIAbstractGatewayClient.getTimestampHeader('to',dateTo);
         if(limit){
-            frame += 'limit'+limit;
+            frame += 'limit:'+limit;
         }
         frame += '\n';
         return frame;
@@ -785,7 +786,6 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         };
         this.ws.onmessage = (event:MessageEvent)=>{
             let command: string = SIGatewayClient.peekFrameCommand(event.data);
-            let frame:string="";
             let receivedMessage:SIMessage;
             let receivedMessagesRead:SIMessage[];
             // In AUTHORIZE state, we only handle AUTHORIZED messages
@@ -798,6 +798,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                 if(receivedMessage.gatewayVersion){
                     this.gatewayVersion=receivedMessage.gatewayVersion;
                 }
+				this.osi.onConnect(receivedMessage);
             }
             else if(this.state===SIConnectionState.CONNECTED){
                 switch (command) {
@@ -908,7 +909,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * device_id must be present too.
      * @param flags: Flags to control level of detail of the response.
      */
-    public describe(deviceAccessId:string, deviceId?:string, propertyId?:number, flags?:SIDescriptionFlags[]){
+    public describe(deviceAccessId?:string, deviceId?:string, propertyId?:number, flags?:SIDescriptionFlags[]){
         this.ensureInState(SIConnectionState.CONNECTED);
         if(this.ws) {
             this.ws.send(SIGatewayClient.encodeDescribeFrame(deviceAccessId,deviceId,propertyId, flags));

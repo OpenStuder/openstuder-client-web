@@ -5,13 +5,13 @@ import logo from "./logo-studer.png"
 
 import {OpenStuderInterface, SIConnectionState, SIMessage, SIGatewayClient} from "../OpenStuder/OpenStuder";
 
-let oui;
-
 type AppState={
   testAuthorize:string,
   testEnumerate:string,
   testRead:string,
 }
+
+let oui;
 
 class App extends React.Component<{ }, AppState> implements OpenStuderInterface{
 
@@ -23,7 +23,7 @@ class App extends React.Component<{ }, AppState> implements OpenStuderInterface{
     }
 
     public componentDidMount() {
-        this.sigc.connect("ws://153.109.24.113",1987, "installer", "installer");
+        this.sigc.connect("ws://172.22.22.55",1987, "installer", "installer");
     }
 
     public render() {
