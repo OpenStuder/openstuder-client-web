@@ -21,7 +21,7 @@ export enum SIStatus{
     INVALID_VALUE = -6,
 }
 
-function SIStatusFromString(str:string):SIStatus{
+export function SIStatusFromString(str:string):SIStatus{
     switch(str){
         case "Success":
             return SIStatus.SUCCESS;
@@ -78,7 +78,7 @@ export enum SIAccessLevel{
     QUALIFIED_SERVICE_PERSONNEL
 }
 
-function SIAccessLevelFromString(str:string):SIAccessLevel{
+export function SIAccessLevelFromString(str:string):SIAccessLevel{
     switch(str){
         case("None"):
             return SIAccessLevel.NONE;
