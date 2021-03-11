@@ -21,7 +21,7 @@ export enum SIStatus{
     INVALID_VALUE = -6,
 }
 
-export function SIStatusFromString(str:string):SIStatus{
+function SIStatusFromString(str:string):SIStatus{
     switch(str){
         case "Success":
             return SIStatus.SUCCESS;
@@ -78,7 +78,7 @@ export enum SIAccessLevel{
     QUALIFIED_SERVICE_PERSONNEL
 }
 
-export function SIAccessLevelFromString(str:string):SIAccessLevel{
+function SIAccessLevelFromString(str:string):SIAccessLevel{
     switch(str){
         case("None"):
             return SIAccessLevel.NONE;
@@ -154,14 +154,20 @@ type SIInformation={
     gatewayVersion?:string,
 }
 
+/**
+ * The SIDPropertyReadResult class represents the status of a property read result.
+ */
 export type SIPropertyReadResult={
-    status:string,
+    status:SIStatus,
     id:string,
     value?:any,
 }
 
+/**
+ * The SIDSubscriptionsResult class represents the status of a property subscription/unsubscription.
+ */
 export type SISubscriptionsResult={
-    status:string,
+    status:SIStatus,
     id:string,
 }
 
@@ -427,11 +433,11 @@ class SIAbstractGatewayClient {
             if(status==="Success"){
                 for(let i=0; i<jsonBody.length;i++){
                     let temp:SIPropertyReadResult={
-                        status:"",
+                        status:SIStatus.ERROR,
                         id:"",
                         value:""
                     };
-                    temp.status=jsonBody[i].status;
+                    temp.status=SIStatusFromString(jsonBody[i].status);
                     temp.id=jsonBody[i].id;
                     temp.value=jsonBody[i].value;
                     retVal.push(temp);
@@ -547,10 +553,10 @@ class SIAbstractGatewayClient {
             if(status==="Success"){
                 for(let i=0; i<jsonBody.length;i++){
                     let temp:SIPropertyReadResult={
-                        status:"",
+                        status:SIStatus.ERROR,
                         id:"",
                     };
-                    temp.status=jsonBody[i].status;
+                    temp.status=SIStatusFromString(jsonBody[i].status);
                     temp.id=jsonBody[i].id;
                     retVal.push(temp);
                 }
@@ -620,10 +626,10 @@ class SIAbstractGatewayClient {
             if(status==="Success"){
                 for(let i=0; i<jsonBody.length;i++){
                     let temp:SIPropertyReadResult={
-                        status:"",
+                        status:SIStatus.ERROR,
                         id:"",
                     };
-                    temp.status=jsonBody[i].status;
+                    temp.status=SIStatusFromString(jsonBody[i].status);
                     temp.id=jsonBody[i].id;
                     retVal.push(temp);
                 }
