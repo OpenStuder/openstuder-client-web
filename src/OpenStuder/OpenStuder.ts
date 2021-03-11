@@ -154,6 +154,28 @@ type SIInformation={
     gatewayVersion?:string,
 }
 
+export type SIPropertyReadResult={
+    status:string,
+    id:string,
+    value?:any,
+}
+
+export type SISubscriptionsResult={
+    status:string,
+    id:string,
+}
+
+/**
+ * The SIDeviceMessage class represents a message a device connected to the OpenStuder gateway has broadcast.
+ */
+export type SIDeviceMessage={
+    timestamp:string,
+    accessId:string,
+    deviceId:string,
+    messageId:string,
+    message:string
+}
+
 /**
  * @class SIProtocolError
  * Class for reporting all OpenStuder protocol errors.
@@ -382,6 +404,51 @@ class SIAbstractGatewayClient {
         return retVal;
     }
 
+    /**
+     * Encode a read properties frame to receive the current value of the multiple properties
+     * @param propertyIds Properties to be read
+     */
+    protected static encodeReadPropertiesFrame(propertyIds:string[]):string{
+        let frame = "READ PROPERTIES\n\n";
+        frame += JSON.stringify(propertyIds);
+        return frame;
+    }
+
+    /**
+     * Decode a properties read frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
+     * */
+    protected static decodePropertiesReadFrame(frame:string):SIPropertyReadResult[]{
+        let retVal:SIPropertyReadResult[]= [];
+        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        if(decodedFrame.command==="PROPERTIES READ" && decodedFrame.headers.has("status")) {
+            let jsonBody = JSON.parse(decodedFrame.body);
+            let status = decodedFrame.headers.get("status");
+            if(status==="Success"){
+                for(let i=0; i<jsonBody.length;i++){
+                    let temp:SIPropertyReadResult={
+                        status:"",
+                        id:"",
+                        value:""
+                    };
+                    temp.status=jsonBody[i].status;
+                    temp.id=jsonBody[i].id;
+                    temp.value=jsonBody[i].value;
+                    retVal.push(temp);
+                }
+            }
+            else{
+                SIProtocolError.raise("Error on status on read properties frame: " + status);
+            }
+        }
+        else if(decodedFrame.command==="ERROR"){
+            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
+        }
+        else{
+            SIProtocolError.raise("unknown error during property read");
+        }
+        return retVal;
+    }
 
     /**
      * Encode a write property frame to write a new parameter for the system
@@ -458,6 +525,49 @@ class SIAbstractGatewayClient {
     }
 
     /**
+     * Encode a frame to be send to subscribe to multiple properties
+     * @param propertyIds Properties to subscribe
+     */
+    protected static encodeSubscribePropertiesFrame(propertyIds:string[]):string{
+        let frame = "SUBSCRIBE PROPERTIES\n\n";
+        frame += JSON.stringify(propertyIds);
+        return frame;
+    }
+
+    /**
+     * Decode a properties subscribe frame into an array of SISubscriptionResult
+     * @param frame Frame to be decoded
+     */
+    protected static decodePropertiesSubscribedFrame(frame:string):SISubscriptionsResult[]{
+        let retVal:SISubscriptionsResult[]= [];
+        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        if(decodedFrame.command==="PROPERTIES SUBSCRIBED" && decodedFrame.headers.has("status")) {
+            let jsonBody = JSON.parse(decodedFrame.body);
+            let status = decodedFrame.headers.get("status");
+            if(status==="Success"){
+                for(let i=0; i<jsonBody.length;i++){
+                    let temp:SIPropertyReadResult={
+                        status:"",
+                        id:"",
+                    };
+                    temp.status=jsonBody[i].status;
+                    temp.id=jsonBody[i].id;
+                    retVal.push(temp);
+                }
+            }
+            else{
+                SIProtocolError.raise("Error on status on properties subscribed: " + status);
+            }
+        }
+        else if(decodedFrame.command==="ERROR"){
+            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
+        }
+        else{
+            SIProtocolError.raise("unknown error during property read");
+        }
+        return retVal;
+    }
+    /**
      * Encode an unsubscribe frame to cancel the subscription to a property
      * @param propertyId Property to unsubscribe
      */
@@ -488,6 +598,48 @@ class SIAbstractGatewayClient {
     }
 
     /**
+     * Encode a frame to be send to unsubscribe to multiple properties
+     * @param propertyIds Properties to unsubscribe
+     */
+    protected static encodeUnsubscribePropertiesFrame(propertyIds:string[]):string{
+        let frame = "UNSUBSCRIBE PROPERTIES\n\n";
+        frame += JSON.stringify(propertyIds);
+        return frame;
+    }
+
+    /**
+     * Decode a properties unsubscribe frame into an array of SISubscriptionResult
+     * @param frame Frame to be decoded
+     */
+    protected static decodePropertiesUnsubscribedFrame(frame:string):SISubscriptionsResult[]{
+        let retVal:SISubscriptionsResult[]= [];
+        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        if(decodedFrame.command==="PROPERTIES UNSUBSCRIBED" && decodedFrame.headers.has("status")) {
+            let jsonBody = JSON.parse(decodedFrame.body);
+            let status = decodedFrame.headers.get("status");
+            if(status==="Success"){
+                for(let i=0; i<jsonBody.length;i++){
+                    let temp:SIPropertyReadResult={
+                        status:"",
+                        id:"",
+                    };
+                    temp.status=jsonBody[i].status;
+                    temp.id=jsonBody[i].id;
+                    retVal.push(temp);
+                }
+            }
+            else{
+                SIProtocolError.raise("Error on status on properties unsubscribed frame: " + status);
+            }
+        }
+        else if(decodedFrame.command==="ERROR"){
+            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
+        }
+        else{
+            SIProtocolError.raise("unknown error during property read");
+        }
+        return retVal;
+    }
 
     /**
      * Decode a property update frame into a "SIInformation" instance, received because we are subscribed to this
@@ -705,6 +857,11 @@ export interface SIGatewayCallback{
      */
     onPropertyRead(status:SIStatus, propertyId:string, value?:string):void;
 
+    /**
+     * Called when the multiple properties read operation started using readProperties() has completed on the gateway.
+     * @param results List of all results of the operation.
+     */
+    onPropertiesRead(results:SIPropertyReadResult[]):void;
 
     /**
      * Called when the property write operation started using write_property() has completed on the gateway.
@@ -721,6 +878,12 @@ export interface SIGatewayCallback{
      */
     onPropertySubscribed(status:SIStatus, propertyId:string):void;
 
+    /**
+     * Called when the gateway returned the status of the properties subscription requested using
+     * the subscribeToProperties() method.
+     * @param statuses The statuses of the individual subscriptions
+     */
+    onPropertiesSubscribed(statuses:SISubscriptionsResult[]):void;
 
     /**
      * Called when the gateway returned the status of the property unsubscription requested
@@ -730,6 +893,12 @@ export interface SIGatewayCallback{
      */
     onPropertyUnsubscribed(status:SIStatus, propertyId:string):void;
 
+    /**
+     * Called when the gateway returned the status of the properties unsubscription requested using
+     * the unsubscribeFromProperties() method.
+     * @param statuses The statuses of the individual subscriptions
+     */
+    onPropertiesUnsubscribed(statuses:SISubscriptionsResult[]):void;
 
     /**
      * This callback is called whenever the gateway send a property update.
@@ -803,6 +972,8 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
+    public setCallback(siGatewayCallback:SIGatewayCallback){
+        this.siGatewayCallback=siGatewayCallback;
     }
 
     /**
@@ -876,6 +1047,11 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                             this.siGatewayCallback.onPropertyRead(SIStatusFromString(receivedMessage.status),receivedMessage.id,receivedMessage.value);
                         }
                         break;
+                    case "PROPERTIES READ":
+                        let receivedPropertyResult = SIGatewayClient.decodePropertiesReadFrame(event.data);
+                        if(this.siGatewayCallback){
+                            this.siGatewayCallback.onPropertiesRead(receivedPropertyResult);
+                        }
                         break;
                     case "PROPERTY WRITTEN":
                         receivedMessage = SIGatewayClient.decodePropertyWrittenFrame(event.data);
@@ -890,6 +1066,11 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                             this.siGatewayCallback.onPropertySubscribed(SIStatusFromString(receivedMessage.status),receivedMessage.id);
                         }
                         break;
+                    case "PROPERTIES SUBSCRIBED":
+                        let receivedSubscriptionResult:SISubscriptionsResult[]=SIGatewayClient.decodePropertiesSubscribedFrame(event.data);
+                        if(this.siGatewayCallback){
+                            this.siGatewayCallback.onPropertiesSubscribed(receivedSubscriptionResult);
+                        }
                         break;
                     case "PROPERTY UNSUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertyUnsubscribedFrame(event.data);
@@ -897,6 +1078,11 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                             this.siGatewayCallback.onPropertyUnsubscribed(SIStatusFromString(receivedMessage.status),receivedMessage.id);
                         }
                         break;
+                    case "PROPERTIES UNSUBSCRIBED":
+                        let receivedUnsubscriptionResult:SISubscriptionsResult[]=SIGatewayClient.decodePropertiesUnsubscribedFrame(event.data);
+                        if(this.siGatewayCallback){
+                            this.siGatewayCallback.onPropertiesUnsubscribed(receivedUnsubscriptionResult);
+                        }
                         break;
                     case "PROPERTY UPDATE":
                         receivedMessage = SIGatewayClient.decodePropertyUpdateFrame(event.data);
@@ -1012,6 +1198,19 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
+    /**
+     * This method is used to retrieve the actual value of multiple property at the same time from the connected
+     * gateway. The properties are identified by the property_ids parameter.
+     * The status of the multiple read operations and the actual value of the property are reported using the
+     * onPropertiesRead() callback.
+     * @param propertyIds The IDs of the properties to read in the form '{device access ID}.{device ID}.{property ID}'.
+     */
+    public readProperties(propertyIds:string[]){
+        this.ensureInState(SIConnectionState.CONNECTED);
+        if(this.ws){
+            this.ws.send(SIGatewayClient.encodeReadPropertiesFrame(propertyIds));
+        }
+    }
 
     /**
      * The write_property method is used to change the actual value of a given property. The property is identified
@@ -1045,6 +1244,19 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
+    /**
+     *This method can be used to subscribe to multiple properties on the connected gateway.
+     * The properties are identified by the property_ids parameter. The status of the subscribe request is
+     * reported using the on_properties_subscribed() callback
+     * @param propertyIds The list of IDs of the properties to subscribe to
+     * in the form '{device access ID}.{device ID}.{property ID}'.
+     */
+    public subscribeToProperties(propertyIds:string[]){
+        this.ensureInState(SIConnectionState.CONNECTED);
+        if(this.ws) {
+            this.ws.send(SIGatewayClient.encodeSubscribePropertiesFrame(propertyIds));
+        }
+    }
 
     /**
      * This method can be used to unsubscribe from a property on the connected gateway.
@@ -1060,6 +1272,19 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
+    /**
+     * This method can be used to unsubscribe from multiple properties on the connected gateway.
+     * The properties are identified by the property_ids parameter. The status of the unsubscribe request is reported
+     * using the on_properties_unsubscribed() callback.
+     * @param propertyId The list of IDs of the properties to unsubscribe from in the form
+     * '{device access ID}.{device ID}.{property ID}'.
+     */
+    public unsubscribeFromProperties(propertyId:string[]){
+        this.ensureInState(SIConnectionState.CONNECTED);
+        if(this.ws) {
+            this.ws.send(SIGatewayClient.encodeUnsubscribePropertiesFrame(propertyId));
+        }
+    }
 
     /**
      * This method is used to retrieve all or a subset of logged data of a given property from the gateway.
