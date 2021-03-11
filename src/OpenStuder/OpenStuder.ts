@@ -727,17 +727,37 @@ class SIAbstractGatewayClient {
     }
 
     /**
-     * Decode the messages read into a "SIDeviceMessage" instance
-     * property
-     * @param frame : frame to be decoded
+     * Decode the messages read into a "SIInformation" instance property
+     * @param frame frame to be decoded
      */
-    static decodeMessagesReadFrame(frame:string):SIMessage[]{
-        let retVal:SIMessage[]=[];
+    protected static decodeMessagesReadFrame(frame:string):SIInformation[]{
+        let retVal:SIInformation[]=[];
         let decodedFrame: DecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "MESSAGES READ" && decodedFrame.headers.has("status" )
             && decodedFrame.headers.has("count"))
         {
-            retVal=JSON.parse(decodedFrame.body);
+            let jsonBody=JSON.parse(decodedFrame.body);
+            for(let i =0; i<jsonBody.length;i++){
+                let message:SIInformation={
+                    timestamp: jsonBody.timestamp,
+                    accessId: jsonBody.accessId,
+                    deviceId: jsonBody.deviceId,
+                    messageId: jsonBody.messageId,
+                    message: jsonBody.message
+                }
+                retVal.push(message);
+            }
+            if(retVal[0]) {
+                retVal[0].status = decodedFrame.headers.get("status");
+                retVal[0].count = decodedFrame.headers.get("count");
+            }
+            else{
+                let temp:SIInformation={
+                    status : decodedFrame.headers.get("status"),
+                    count : decodedFrame.headers.get("count")
+                }
+                retVal.push(temp);
+            }
         } else if (decodedFrame.command === "ERROR") {
             SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
         } else {
@@ -1111,8 +1131,27 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                         }
                         break;
                     case "MESSAGES READ":
-                        receivedMessagesRead = SIGatewayClient.decodeMessagesReadFrame(event.data);
-                        this.osi.onMessageRead(receivedMessagesRead);
+                        let receivedMessagesRead:SIInformation[] = SIGatewayClient.decodeMessagesReadFrame(event.data);
+                        let deviceMessages:SIDeviceMessage[]=[];
+                        let count:number=0;
+                        receivedMessagesRead.map(receivedMessageRead =>{
+                            if(receivedMessageRead.timestamp && receivedMessageRead.accessId &&
+                                receivedMessageRead.deviceId && receivedMessageRead.messageId &&
+                                receivedMessageRead.message) {
+                                deviceMessages[count] = {
+                                    timestamp: receivedMessageRead.timestamp,
+                                    accessId: receivedMessageRead.accessId,
+                                    deviceId: receivedMessageRead.deviceId,
+                                    messageId: receivedMessageRead.messageId,
+                                    message: receivedMessageRead.message
+                                }
+                                count++;
+                            }
+                        });
+                        if(this.siGatewayCallback && receivedMessagesRead[0].status && receivedMessagesRead[0].count) {
+                            this.siGatewayCallback.onMessageRead(SIStatusFromString(receivedMessagesRead[0].status),+receivedMessagesRead[0].count
+                                , deviceMessages);
+                        }
                         break;
                     default:
                         SIProtocolError.raise("unsupported frame command :"+command);
