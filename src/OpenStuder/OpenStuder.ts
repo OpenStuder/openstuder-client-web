@@ -21,6 +21,29 @@ export enum SIStatus{
     INVALID_VALUE = -6,
 }
 
+function SIStatusFromString(str:string):SIStatus{
+    switch(str){
+        case "Success":
+            return SIStatus.SUCCESS;
+        case "InProgress":
+            return SIStatus.IN_PROGRESS;
+        case "Error":
+            return SIStatus.ERROR;
+        case "NoProperty":
+            return SIStatus.NO_PROPERTY;
+        case "NoDevice":
+            return SIStatus.NO_DEVICE;
+        case "NoDeviceAccess":
+            return SIStatus.NO_DEVICE_ACCESS;
+        case "Timeout":
+            return SIStatus.TIMEOUT;
+        case "InvalidValue":
+            return SIStatus.INVALID_VALUE;
+        default:
+            return SIStatus.ERROR;
+    }
+}
+
 /**
  * State of the connection to the OpenStuder gateway.
  *
@@ -54,6 +77,7 @@ export enum SIAccessLevel{
     EXPERT,
     QUALIFIED_SERVICE_PERSONNEL
 }
+
 function SIAccessLevelFromString(str:string):SIAccessLevel{
     switch(str){
         case("None"):
@@ -114,7 +138,7 @@ type DecodedFrame={
 /**
  * Information of received messages will be transferred between class with this type
  */
-export type SIMessage={
+type SIInformation={
     body?:string,
     status?:string,
     deviceCount?:string,
@@ -147,9 +171,9 @@ class SIProtocolError{
 class SIAbstractGatewayClient {
     /**
      * Function used to separate the information into a "DecodedFrame" instance
-     * @param frame : frame to be decoded
+     * @param frame FSrame to be decoded
      */
-    static decodeFrame(frame:string):DecodedFrame{
+    protected static decodeFrame(frame:string):DecodedFrame{
         let command:string="INVALID";
         let headers:Map<string,string>=new Map<string, string>();
 
@@ -169,17 +193,15 @@ class SIAbstractGatewayClient {
         line -=1;
         let body = lines[line];
 
-        let decodedFrame:DecodedFrame={body:body,headers:headers,command:command};
-        return decodedFrame;
-
+        return {body: body, headers: headers, command: command};
     }
 
     /**
      * Encode a frame to be send to the gateway with the different credentials
-     * @param user : name of the user
-     * @param password : password for the user
+     * @param user Name of the user
+     * @param password Password for the user
      */
-    static encodeAuthorizeFrame(user?:string, password?:string):string{
+    protected static encodeAuthorizeFrame(user?:string, password?:string):string{
         if(user===undefined || password === undefined) {
             return "AUTHORIZE\nuser:" + user + "\npassword:" + password + "\nprotocol_version:1\n\n";
         }
@@ -189,12 +211,12 @@ class SIAbstractGatewayClient {
     }
 
     /**
-     * Decode an authorize frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode an authorize frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
      */
-    static decodeAuthorizedFrame(frame:string):SIMessage{
+    protected static decodeAuthorizedFrame(frame:string):SIInformation{
         let decodedFrame:DecodedFrame = this.decodeFrame(frame);
-        let retVal:SIMessage= {
+        let retVal:SIInformation= {
             accessLevel:undefined,
             gatewayVersion:undefined,
         };
@@ -223,16 +245,16 @@ class SIAbstractGatewayClient {
     /**
      * Encode a frame to be send to receive the number of device available
      */
-    static encodeEnumerateFrame(){
+    protected static encodeEnumerateFrame(){
         return "ENUMERATE\n\n";
     }
 
     /**
-     * Decode an enumerate frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode an enumerate frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
      */
-    static decodeEnumerateFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodeEnumerateFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             status:undefined,
             deviceCount:undefined,
         };
@@ -252,12 +274,12 @@ class SIAbstractGatewayClient {
 
     /**
      * Encode a describe frame to be send to receive the description of the device(s)
-     * @param deviceAccessId : select the accessor
-     * @param deviceId : select the device, undefined will give all devices
-     * @param propertyId : select the property of the selected device, undefined will give all properties
-     * @param flags : if present, gives additional information
+     * @param deviceAccessId Select the accessor
+     * @param deviceId Select the device, undefined will give all devices
+     * @param propertyId Select the property of the selected device, undefined will give all properties
+     * @param flags If present, gives additional information
      */
-    static encodeDescribeFrame(deviceAccessId?:string, deviceId?:string,
+    protected static encodeDescribeFrame(deviceAccessId?:string, deviceId?:string,
                                propertyId?:number, flags?:SIDescriptionFlags[]):string{
         let frame="DESCRIBE\n";
         if(deviceAccessId){
@@ -295,11 +317,11 @@ class SIAbstractGatewayClient {
     }
 
     /**
-     * Decode a description frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode a description frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
      */
-    static decodeDescriptionFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodeDescriptionFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             body:undefined,
             status:undefined,
         };
@@ -325,18 +347,18 @@ class SIAbstractGatewayClient {
 
     /**
      * Encode a read property frame to receive the current value of a property
-     * @param propertyId : property to be read
+     * @param propertyId Property to be read
      */
-    static encodeReadPropertyFrame(propertyId:string):string{
+    protected static encodeReadPropertyFrame(propertyId:string):string{
         return "READ PROPERTY\nid:"+propertyId+"\n\n";
     }
 
     /**
-     * Decode a property read frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode a property read frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
      */
-    static decodePropertyReadFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodePropertyReadFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             status:undefined,
             id:undefined,
             value:undefined,
@@ -360,13 +382,14 @@ class SIAbstractGatewayClient {
         return retVal;
     }
 
+
     /**
      * Encode a write property frame to write a new parameter for the system
-     * @param propertyId : property to be written
-     * @param value : new value
-     * @param flags : determine if the new value should be stocked in the database
+     * @param propertyId Property to be written
+     * @param value New value
+     * @param flags dDetermine if the new value should be stocked in the database
      */
-    static encodeWritePropertyFrame(propertyId:string, value?:string, flags?:SIWriteFlags):string{
+    protected static encodeWritePropertyFrame(propertyId:string, value?:string, flags?:SIWriteFlags):string{
         let frame = "WRITE PROPERTY\nid:" + propertyId + "\n";
         if(flags){
             frame+="flags:";
@@ -383,11 +406,11 @@ class SIAbstractGatewayClient {
     }
 
     /**
-     * Decode a property written frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode a property written frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
      */
-    static decodePropertyWrittenFrame(frame:string):SIMessage {
-        let retVal:SIMessage= {
+    protected static decodePropertyWrittenFrame(frame:string):SIInformation {
+        let retVal:SIInformation= {
             status:undefined,
             id:undefined,
         };
@@ -406,18 +429,18 @@ class SIAbstractGatewayClient {
 
     /**
      * Encode a frame to be send to subscribe to a property
-     * @param propertyId : property to subscribe
+     * @param propertyId Property to subscribe
      */
-    static encodeSubscribePropertyFrame(propertyId:string):string{
+    protected static encodeSubscribePropertyFrame(propertyId:string):string{
         return "SUBSCRIBE PROPERTY\nid:"+propertyId+"\n\n";
     }
 
     /**
-     * Decode a property subscribe frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode a property subscribe frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
      */
-    static decodePropertySubscribedFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodePropertySubscribedFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             status:undefined,
             id:undefined,
         };
@@ -436,18 +459,18 @@ class SIAbstractGatewayClient {
 
     /**
      * Encode an unsubscribe frame to cancel the subscription to a property
-     * @param propertyId : property to unsubscribe
+     * @param propertyId Property to unsubscribe
      */
-    static encodeUnsubscribePropertyFrame(propertyId:string):string{
+    protected static encodeUnsubscribePropertyFrame(propertyId:string):string{
         return "UNSUBSCRIBE PROPERTY\nid:"+propertyId+"\n\n";
     }
 
     /**
-     * Decode an unsubscribe frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode an unsubscribe frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
      */
-    static decodePropertyUnsubscribedFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodePropertyUnsubscribedFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             status:undefined,
             id:undefined,
         };
@@ -465,12 +488,14 @@ class SIAbstractGatewayClient {
     }
 
     /**
-     * Decode a property update frame into a "SIDeviceMessage" instance, received because we are subscribed to this
+
+    /**
+     * Decode a property update frame into a "SIInformation" instance, received because we are subscribed to this
      * property
-     * @param frame : frame to be decoded
+     * @param frame Frame to be decoded
      */
-    static decodePropertyUpdateFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodePropertyUpdateFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             status:undefined,
             id:undefined,
         };
@@ -490,12 +515,12 @@ class SIAbstractGatewayClient {
 
     /**
      * Encode a read datalog frame to be send to get the datalog
-     * @param propertyId : wanted property in the format <device access ID>.<device ID>.<property ID>
-     * @param dateFrom : Start date and time to get logged data from (ISO 8601 extended format)
-     * @param dateTo : End date and time to get the logged data to (ISO 8601 extended format)
-     * @param limit : number of maximum received messages
+     * @param propertyId Wanted property in the format <device access ID>.<device ID>.<property ID>
+     * @param dateFrom Start date and time to get logged data from (ISO 8601 extended format)
+     * @param dateTo End date and time to get the logged data to (ISO 8601 extended format)
+     * @param limit Number of maximum received messages
      */
-    static encodeReadDatalogFrame(propertyId:string, dateFrom?:Date, dateTo?:Date, limit?:number){
+    protected static encodeReadDatalogFrame(propertyId:string, dateFrom?:Date, dateTo?:Date, limit?:number){
         let frame:string = 'READ DATALOG\nid:' + propertyId + '\n';
         frame += SIAbstractGatewayClient.getTimestampHeader('from',dateFrom);
         frame += SIAbstractGatewayClient.getTimestampHeader('to',dateTo);
@@ -507,11 +532,11 @@ class SIAbstractGatewayClient {
     }
 
     /**
-     * Decode a datalog read frame into a "SIDeviceMessage" instance
-     * @param frame : frame to be decoded
+     * Decode a datalog read frame into a "SIInformation" instance
+     * @param frame frame to be decoded
      */
-    static decodeDatalogReadFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodeDatalogReadFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             status:undefined,
             id:undefined,
             count:undefined,
@@ -534,11 +559,11 @@ class SIAbstractGatewayClient {
 
     /**
      * Encode a frame to be send to retrieve all or a subset of stored messages send by devices
-     * @param dateFrom : Start date and time to get logged data from (ISO 8601 extended format)
-     * @param dateTo : End date and time to get the logged data to (ISO 8601 extended format)
-     * @param limit : number of maximum received messages
+     * @param dateFrom start date and time to get logged data from (ISO 8601 extended format)
+     * @param dateTo end date and time to get the logged data to (ISO 8601 extended format)
+     * @param limit number of maximum received messages
      */
-    static encodeReadMessagesFrame(dateFrom?:Date, dateTo?:Date, limit?:number){
+    protected static encodeReadMessagesFrame(dateFrom?:Date, dateTo?:Date, limit?:number){
         let frame:string = 'READ MESSAGES\n';
         frame += SIAbstractGatewayClient.getTimestampHeader('from',dateFrom);
         frame += SIAbstractGatewayClient.getTimestampHeader('to',dateTo);
@@ -570,12 +595,12 @@ class SIAbstractGatewayClient {
     }
 
     /**
-     * Decode the message of the devices into a "SIDeviceMessage" instance
+     * Decode the message of the devices into a "SIInformation" instance
      * property
-     * @param frame : frame to be decoded
+     * @param frame frame to be decoded
      */
-    static decodeDeviceMessageFrame(frame:string):SIMessage{
-        let retVal:SIMessage= {
+    protected static decodeDeviceMessageFrame(frame:string):SIInformation{
+        let retVal:SIInformation= {
             id:undefined,
             accessId:undefined,
             messageId:undefined,
@@ -602,10 +627,10 @@ class SIAbstractGatewayClient {
 
     /**
      * Convert a date time to a string for the encode of frames
-     * @param key : dateFrom (start) or dateTo (stop)
-     * @param timestamp : wanted date
+     * @param key dateFrom (start) or dateTo (stop)
+     * @param timestamp Wanted date
      */
-    static getTimestampHeader(key:string, timestamp?:Date):string{
+    protected static getTimestampHeader(key:string, timestamp?:Date):string{
         if(timestamp){
             return key + ':' + timestamp.toISOString();
         }
@@ -616,107 +641,126 @@ class SIAbstractGatewayClient {
 
     /**
      * Get the first line (the command of the frame)
-     * @param frame : frame to be peeked
+     * @param frame Frame to be peeked
      */
-    static peekFrameCommand(frame:string):string{
+    protected static peekFrameCommand(frame:string):string{
         //Return the first line of the received frame
         return (frame.split("\n"))[0];
     }
 }
 
 /**
- * @interface OpenStuderInterface
+ * @interface SIGatewayCallback
  * Base Interface containing all callback methods that can be called by the SIGatewayClient.
  * You can implement this class to your application.
  */
-export abstract class OpenStuderInterface{
+export interface SIGatewayCallback{
 
     /**
      * This method is called once the connection to the gateway could be established and
      * the user has been successfully authorized.
-     * @param deviceMessage: message information
+     * @param accessLevel Access level that was granted to the user during authorization.
+     * @param gatewayVersion Version of the OpenStuder software running on the gateway.
      */
-    public abstract onConnect(deviceMessage:SIMessage):void;
+    onConnected(accessLevel:SIAccessLevel, gatewayVersion:string):void;
 
     /**
      * Called when the connection to the OpenStuder gateway has
      * been gracefully closed by either side or the connection was lost by any other reason.
      */
-    public abstract onDisconnected():void;
+    onDisconnected():void;
 
     /**
      * Called when the state of the connection changed
-     * @param state: new state of the connection
+     * @param state new state of the connection
      */
-    public abstract onChangeConnectionState(state:SIConnectionState):void;
+    onConnectionStateChanged(state:SIConnectionState):void;
 
     /**
      * Called when the enumeration operation started using enumerate() has completed on the gateway.
-     * @param deviceMessage: message information
+     * @param status Operation status.
+     * @param deviceCount Number of devices present
      */
-    public abstract onEnumerate(deviceMessage:SIMessage):void;
+    onEnumerated(status:SIStatus, deviceCount:number):void;
 
     /**
      * Called on severe errors.
-     * @param reason: Exception that caused the erroneous behavior
+     * @param reason Exception that caused the erroneous behavior
      */
-    public abstract onError(reason:string):void;
+    onError(reason:string):void;
 
     /**
      * Called when the gateway returned the description requested using the describe() method.
-     * @param deviceMessage: message information
+     * @param status Status of the operation.
+     * @param description Description object.
+     * @param id Subject's ID.
      */
-    public abstract onDescription(deviceMessage:SIMessage):void;
+    onDescription(status:SIStatus, description:string, id?:string):void;
 
     /**
      * Called when the property read operation started using read_property() has completed on the gateway.
-     * @param deviceMessage: message information
+     * @param status Status of the read operation.
+     * @param propertyId ID of the property read.
+     * @param value The value read.
      */
-    public abstract onPropertyRead(deviceMessage:SIMessage):void;
+    onPropertyRead(status:SIStatus, propertyId:string, value?:string):void;
+
 
     /**
      * Called when the property write operation started using write_property() has completed on the gateway.
-     * @param deviceMessage: message information
+     * @param status Status of the write operation.
+     * @param propertyId ID of the property written.
      */
-    public abstract onPropertyWritten(deviceMessage:SIMessage):void;
+    onPropertyWritten(status:SIStatus, propertyId:string):void;
 
     /**
      * Called when the gateway returned the status of the property subscription requested
      * using the property_subscribe() method.
-     * @param deviceMessage: message information
+     * @param status The status of the subscription.
+     * @param propertyId ID of the property.
      */
-    public abstract onPropertySubscribed(deviceMessage:SIMessage):void;
+    onPropertySubscribed(status:SIStatus, propertyId:string):void;
+
 
     /**
      * Called when the gateway returned the status of the property unsubscription requested
      * using the property_unsubscribe() method.
-     * @param deviceMessage: message information
+     * @param status The status of the unsubscription.
+     * @param propertyId ID of the property
      */
-    public abstract onPropertyUnsubscribed(deviceMessage:SIMessage):void;
+    onPropertyUnsubscribed(status:SIStatus, propertyId:string):void;
+
 
     /**
      * This callback is called whenever the gateway send a property update.
-     * @param deviceMessage: message information
+     * @param propertyId ID of the updated property.
+     * @param value The current value of the property.
      */
-    public abstract onPropertyUpdate(deviceMessage:SIMessage):void;
+    onPropertyUpdated(propertyId:string, value:any):void;
 
     /**
      * Called when the datalog read operation started using read_datalog() has completed on the gateway.
-     * @param deviceMessage: message information
+     * @param status Status of the operation.
+     * @param propertyId ID of the property.
+     * @param count Number of entries.
+     * @param values Properties data in CSV format whereas the first column is the date and time in ISO 8601 extended
+     * format and the second column contains the actual values.
      */
-    public abstract onDatalogRead(deviceMessage:SIMessage):void;
+    onDatalogRead(status:SIStatus, propertyId:string, count:number, values:string):void;
 
     /**
      * This callback is called whenever the gateway send a device message indication.
-     * @param deviceMessage: message information
+     * @param message The device message received.
      */
-    public abstract onDeviceMessage(deviceMessage:SIMessage):void;
+    onDeviceMessage(message:SIDeviceMessage):void;
 
     /**
      * Called when the gateway returned the status of the read messages operation using the read_messages() method.
-     * @param devicesMessage: message information
+     * @param status The status of the operation.
+     * @param count Number of messages retrieved.
+     * @param messages List of retrieved messages.
      */
-    public abstract onMessageRead(devicesMessage:SIMessage[]):void;
+    onMessageRead(status:SIStatus, count:number, messages:SIDeviceMessage[]):void;
 }
 
 /**
@@ -728,22 +772,22 @@ export abstract class OpenStuderInterface{
  */
 export class SIGatewayClient extends SIAbstractGatewayClient{
     //Attributes
-    state: SIConnectionState;
-    accessLevel: SIAccessLevel;
-    gatewayVersion: string;
-    ws:WebSocket|null;
+    private state: SIConnectionState;
+    private accessLevel: SIAccessLevel;
+    private gatewayVersion: string;
+    private ws: WebSocket|null;
 
-    user?:string;
-    password?:string;
-    osi:OpenStuderInterface;
+    private user?:string;
+    private password?:string;
 
-    public constructor(osi:OpenStuderInterface){
+    private siGatewayCallback:SIGatewayCallback | undefined;
+
+    public constructor(){
         super();
         this.state = SIConnectionState.DISCONNECTED;
         this.gatewayVersion='';
         this.accessLevel=SIAccessLevel.NONE;
         this.ws=null;
-        this.osi=osi;
     }
 
     protected ensureInState(state:SIConnectionState){
@@ -754,7 +798,11 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
 
     protected setStateSI(state:SIConnectionState){
         this.state=state;
-        this.osi.onChangeConnectionState(this.state);
+        if(this.siGatewayCallback) {
+            this.siGatewayCallback.onConnectionStateChanged(this.state);
+        }
+    }
+
     }
 
     /**
@@ -764,10 +812,10 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * The status of the connection attempt is reported either by the on_connected() callback on success or
      * the on_error() callback if the connection could not be established or the authorisation for the given
      * user was rejected by the gateway.
-     * @param host: Hostname or IP address of the OpenStuder gateway to connect to.
-     * @param port: TCP port used for the connection to the OpenStuder gateway, defaults to 1987
-     * @param user: Username send to the gateway used for authorization.
-     * @param password: Password send to the gateway used for authorization.
+     * @param host Hostname or IP address of the OpenStuder gateway to connect to.
+     * @param port TCP port used for the connection to the OpenStuder gateway, defaults to 1987
+     * @param user Username send to the gateway used for authorization.
+     * @param password Password send to the gateway used for authorization.
      */
     public connect(host:string,port:number = 1987,user?:string,password?:string) {
         this.ensureInState(SIConnectionState.DISCONNECTED);
@@ -777,7 +825,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
         this.ws = new WebSocket(host + ':' + port);
         this.setStateSI(SIConnectionState.CONNECTING);
-        this.ws.onopen = (event:Event)=>{
+        this.ws.onopen = (/*event:Event*/)=>{
             this.setStateSI(SIConnectionState.AUTHORIZING);
             let frame = SIGatewayClient.encodeAuthorizeFrame(user,password);
             if(this.ws){
@@ -786,8 +834,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         };
         this.ws.onmessage = (event:MessageEvent)=>{
             let command: string = SIGatewayClient.peekFrameCommand(event.data);
-            let receivedMessage:SIMessage;
-            let receivedMessagesRead:SIMessage[];
+            let receivedMessage:SIInformation;
             // In AUTHORIZE state, we only handle AUTHORIZED messages
             if(this.state===SIConnectionState.AUTHORIZING && command ==="AUTHORIZED"){
                 this.setStateSI(SIConnectionState.CONNECTED);
@@ -798,49 +845,84 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                 if(receivedMessage.gatewayVersion){
                     this.gatewayVersion=receivedMessage.gatewayVersion;
                 }
-				this.osi.onConnect(receivedMessage);
+                if(this.siGatewayCallback && receivedMessage.accessLevel && receivedMessage.gatewayVersion) {
+                    this.siGatewayCallback.onConnected(SIAccessLevelFromString(receivedMessage.accessLevel),receivedMessage.gatewayVersion);
+                }
             }
             else if(this.state===SIConnectionState.CONNECTED){
                 switch (command) {
                     case "ERROR":
-                        this.osi.onError(""+SIGatewayClient.decodeFrame(event.data).headers.get("reason"))
+                        if(this.siGatewayCallback) {
+                            this.siGatewayCallback.onError("" + SIGatewayClient.decodeFrame(event.data).headers.get("reason"))
+                        }
                         SIProtocolError.raise(""+SIGatewayClient.decodeFrame(event.data).headers.get("reason"));
                         break;
                     case "ENUMERATED":
                         receivedMessage = SIGatewayClient.decodeEnumerateFrame(event.data);
-                        this.osi.onEnumerate(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.deviceCount) {
+                            this.siGatewayCallback.onEnumerated(SIStatusFromString(receivedMessage.status),+receivedMessage.deviceCount);
+                        }
                         break;
                     case "DESCRIPTION":
                         receivedMessage = SIGatewayClient.decodeDescriptionFrame(event.data);
-                        this.osi.onDescription(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.body) {
+                            //status: SIStatus, id_: Optional[str], description: object
+                            this.siGatewayCallback.onDescription(SIStatusFromString(receivedMessage.status),receivedMessage.body,receivedMessage.id);
+                        }
                         break;
                     case "PROPERTY READ":
                         receivedMessage = SIGatewayClient.decodePropertyReadFrame(event.data);
-                        this.osi.onPropertyRead(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
+                            this.siGatewayCallback.onPropertyRead(SIStatusFromString(receivedMessage.status),receivedMessage.id,receivedMessage.value);
+                        }
+                        break;
                         break;
                     case "PROPERTY WRITTEN":
                         receivedMessage = SIGatewayClient.decodePropertyWrittenFrame(event.data);
-                        this.osi.onPropertyWritten(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
+                            //status:SIStatus, propertyId:string
+                            this.siGatewayCallback.onPropertyWritten(SIStatusFromString(receivedMessage.status),receivedMessage.id);
+                        }
                         break;
                     case "PROPERTY SUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertySubscribedFrame(event.data);
-                        this.osi.onPropertySubscribed(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
+                            this.siGatewayCallback.onPropertySubscribed(SIStatusFromString(receivedMessage.status),receivedMessage.id);
+                        }
+                        break;
                         break;
                     case "PROPERTY UNSUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertyUnsubscribedFrame(event.data);
-                        this.osi.onPropertyUnsubscribed(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
+                            this.siGatewayCallback.onPropertyUnsubscribed(SIStatusFromString(receivedMessage.status),receivedMessage.id);
+                        }
+                        break;
                         break;
                     case "PROPERTY UPDATE":
                         receivedMessage = SIGatewayClient.decodePropertyUpdateFrame(event.data);
-                        this.osi.onPropertyUpdate(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.id) {
+                            this.siGatewayCallback.onPropertyUpdated(receivedMessage.id, receivedMessage.value);
+                        }
                         break;
                     case "DATALOG READ":
                         receivedMessage = SIGatewayClient.decodeDatalogReadFrame(event.data);
-                        this.osi.onDatalogRead(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id && receivedMessage.body && receivedMessage.count) {
+                            this.siGatewayCallback.onDatalogRead(SIStatusFromString(receivedMessage.status),receivedMessage.id, +receivedMessage.count, receivedMessage.body);
+                        }
                         break;
                     case "DEVICE MESSAGE":
                         receivedMessage = SIGatewayClient.decodeDeviceMessageFrame(event.data);
-                        this.osi.onDeviceMessage(receivedMessage);
+                        if(this.siGatewayCallback && receivedMessage.timestamp && receivedMessage.accessId && receivedMessage.deviceId
+                            && receivedMessage.messageId && receivedMessage.message) {
+                            let deviceMessage:SIDeviceMessage={
+                                timestamp:receivedMessage.timestamp,
+                                accessId:receivedMessage.accessId,
+                                deviceId:receivedMessage.deviceId,
+                                messageId:receivedMessage.messageId,
+                                message:receivedMessage.message
+                            }
+                            this.siGatewayCallback.onDeviceMessage(deviceMessage);
+                        }
                         break;
                     case "MESSAGES READ":
                         receivedMessagesRead = SIGatewayClient.decodeMessagesReadFrame(event.data);
@@ -851,7 +933,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                 }
             }
         }
-        this.ws.onclose = (event:Event)=>{
+        this.ws.onclose = (/*event:Event*/)=>{
             this.setStateSI(SIConnectionState.DISCONNECTED);
             this.accessLevel = SIAccessLevel.NONE;
         }
@@ -862,7 +944,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
 
     /**
      * Returns the current state of the client. See "SIConnectionState" for details.
-     * @return : Current state of the client
+     * @return Current state of the client
      */
     public getState():SIConnectionState{
         return this.state;
@@ -870,7 +952,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
 
     /**
      * Return the access level the client has gained on the gateway connected. See "SIAccessLevel" for details.
-     * @return : Access level granted to client
+     * @return Access level granted to client
      */
     public getAccessLevel():SIAccessLevel{
         return this.accessLevel;
@@ -878,7 +960,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
 
     /**
      * Returns the version of the OpenStuder gateway software running on the host the client is connected to.
-     * @return : Version of the gateway software
+     * @return Version of the gateway software
      */
     public getGatewayVersion():string{
         return this.gatewayVersion;
@@ -903,11 +985,11 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * The flags control the level of detail in the gateway's response.
      * The description is reported using the on_description() callback.
      * @param deviceAccessId: Device access ID for which the description should be retrieved.
-     * @param deviceId: Device ID for which the description should be retrieved. Note that
+     * @param deviceId Device ID for which the description should be retrieved. Note that
      * device_access_id must be present too.
-     * @param propertyId: Property ID for which the description should be retrieved. Note that device_access_id and
+     * @param propertyId Property ID for which the description should be retrieved. Note that device_access_id and
      * device_id must be present too.
-     * @param flags: Flags to control level of detail of the response.
+     * @param flags Flags to control level of detail of the response.
      */
     public describe(deviceAccessId?:string, deviceId?:string, propertyId?:number, flags?:SIDescriptionFlags[]){
         this.ensureInState(SIConnectionState.CONNECTED);
@@ -921,7 +1003,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * The property is identified by the property_id parameter.
      * The status of the read operation and the actual value of the property are reported using
      * the on_property_read() callback.
-     * @param propertyId: The ID of the property to read in the form '{device access ID}.{device ID}.{property ID}'.
+     * @param propertyId The ID of the property to read in the form '{device access ID}.{device ID}.{property ID}'.
      */
     public readProperty(propertyId:string){
         this.ensureInState(SIConnectionState.CONNECTED);
@@ -930,15 +1012,16 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
+
     /**
      * The write_property method is used to change the actual value of a given property. The property is identified
      * by the property_id parameter and the new value is passed by the optional value parameter.
      * This value parameter is optional as it is possible to write to properties with the data type "Signal" where
      * there is no actual value written, the write operation rather triggers an action on the device.
      * The status of the write operation is reported using the on_property_written() callback.
-     * @param propertyId: The ID of the property to write in the form '{device access ID}.{<device ID}.{<property ID}'.
-     * @param value: Optional value to write.
-     * @param flags: Write flags, See SIWriteFlags for details, if not provided the flags are not send by the client
+     * @param propertyId The ID of the property to write in the form '{device access ID}.{<device ID}.{<property ID}'.
+     * @param value Optional value to write.
+     * @param flags Write flags, See SIWriteFlags for details, if not provided the flags are not send by the client
      * and the gateway uses the default flags
      */
     public writeProperty(propertyId:string,value?:any, flags?:SIWriteFlags){
@@ -952,21 +1035,22 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * This method can be used to subscribe to a property on the connected gateway. The property is identified by
      * the property_id parameter.
      * The status of the subscribe request is reported using the on_property_subscribed() callback.
-     * @param propertyId: The ID of the property to subscribe to in the form
+     * @param propertyId The ID of the property to subscribe to in the form
      * '{device access ID}.{device ID}.{property ID}'.
      */
-    public subscribeProperty(propertyId:string){
+    public subscribeToProperty(propertyId:string){
         this.ensureInState(SIConnectionState.CONNECTED);
         if(this.ws) {
             this.ws.send(SIGatewayClient.encodeSubscribePropertyFrame(propertyId));
         }
     }
 
+
     /**
      * This method can be used to unsubscribe from a property on the connected gateway.
      * The property is identified by the property_id parameter.
      * The status of the unsubscribe request is reported using the on_property_unsubscribed() callback.
-     * @param propertyId: The ID of the property to unsubscribe from in the form
+     * @param propertyId The ID of the property to unsubscribe from in the form
      * '{device access ID}.{device ID}.{property ID}'.
      */
     public unsubscribeFromProperty(propertyId:string){
@@ -976,16 +1060,17 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
+
     /**
      * This method is used to retrieve all or a subset of logged data of a given property from the gateway.
      * The status of this operation and the respective values are reported using the on_datalog_read_csv() callback.
-     * @param propertyId: Global ID of the property for which the logged data should be retrieved. It has to be in the
+     * @param propertyId Global ID of the property for which the logged data should be retrieved. It has to be in the
      * form '{device access ID}.{device ID}.{property ID}'.
-     * @param dateFrom: Optional date and time from which the data has to be retrieved, defaults
+     * @param dateFrom Optional date and time from which the data has to be retrieved, defaults
      * to the oldest value logged.
-     * @param dateTo: Optional date and time to which the data has to be retrieved, defaults to the current
+     * @param dateTo Optional date and time to which the data has to be retrieved, defaults to the current
      * time on the gateway.
-     * @param limit; Using this optional parameter you can limit the number of results retrieved in total.
+     * @param limit Using this optional parameter you can limit the number of results retrieved in total.
      */
     public readDatalog(propertyId:string,dateFrom?:Date,dateTo?:Date,limit?:number){
         this.ensureInState(SIConnectionState.CONNECTED);
@@ -998,11 +1083,11 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * The read_messages method can be used to retrieve all or a subset of stored messages send by devices
      * on all buses in the past from the gateway.
      * The status of this operation and the retrieved messages are reported using the on_messages_read() callback.
-     * @param dateFrom: Optional date and time from which the messages have to be retrieved, defaults
+     * @param dateFrom Optional date and time from which the messages have to be retrieved, defaults
      * to the oldest message saved.
-     * @param dateTo: Optional date and time to which the messages have to be retrieved, defaults
+     * @param dateTo Optional date and time to which the messages have to be retrieved, defaults
      * to the current time on the gateway.
-     * @param limit: Using this optional parameter you can limit the number of messages retrieved in total.
+     * @param limit Using this optional parameter you can limit the number of messages retrieved in total.
      */
     public readMessages(dateFrom?:Date, dateTo?:Date, limit?:number){
         this.ensureInState(SIConnectionState.CONNECTED);
