@@ -1,9 +1,19 @@
 import React from 'react';
 import './App.css';
-
 import logo from "./logo-studer.png"
 
-import {OpenStuderInterface, SIConnectionState, SIMessage, SIGatewayClient} from "../OpenStuder/OpenStuder";
+import {
+    SIGatewayCallback,
+    SIDescriptionFlags,
+    SIWriteFlags,
+    SIConnectionState,
+    SIDeviceMessage,
+    SIGatewayClient,
+    SIAccessLevel,
+    SIStatus,
+    SIPropertyReadResult,
+    SISubscriptionsResult
+} from "../OpenStuder/OpenStuder";
 
 type AppState={
   testAuthorize:string,
@@ -11,19 +21,20 @@ type AppState={
   testRead:string,
 }
 
-let oui;
+class App extends React.Component<{ }, AppState> implements SIGatewayCallback{
 
-class App extends React.Component<{ }, AppState> implements OpenStuderInterface{
+    siGatewayClient:SIGatewayClient;
 
-    sigc:SIGatewayClient;
     constructor(props:any) {
-    super(props);
-    this.state={testAuthorize:"-",testEnumerate:"-",testRead:"-"};
-    this.sigc = new SIGatewayClient(this);
+        super(props);
+        this.state={testAuthorize:"-",testEnumerate:"-",testRead:"-"};
+        this.siGatewayClient = new SIGatewayClient();
     }
 
     public componentDidMount() {
-        this.sigc.connect("ws://172.22.22.55",1987, "installer", "installer");
+        this.siGatewayClient.setCallback(this);
+        //ws://153.109.24.113
+        this.siGatewayClient.connect("ws://172.22.22.50",1987, "qsp", "qsp");
     }
 
     public render() {
@@ -41,57 +52,72 @@ class App extends React.Component<{ }, AppState> implements OpenStuderInterface{
     );
     }
 
-    onChangeConnectionState(state: SIConnectionState): void {
-        if(state===SIConnectionState.CONNECTED){
-            this.sigc.enumerate();
-             this.sigc.readProperty("xcom.10.3023");
+    onConnected(accessLevel: SIAccessLevel, gatewayVersion: string): void {
+        this.siGatewayClient.enumerate();
+    }
+
+    onConnectionStateChanged(state: SIConnectionState): void {
+        if(state===SIConnectionState.CONNECTED) {
+            //this.siGatewayClient.readProperty("xcom.10.3023");
         }
     }
 
-    onDatalogRead(deviceMessage: SIMessage): void {
+    onDatalogRead(status: SIStatus, propertyId: string, count: number, values: string): void {
     }
 
-    onDescription(deviceMessage: SIMessage): void {
+    onDescription(status: SIStatus, description: string, id?: string): void {
     }
 
-    onDeviceMessage(deviceMessage: SIMessage): void {
+    onDeviceMessage(message: SIDeviceMessage): void {
     }
 
-    onEnumerate(deviceMessage: SIMessage): void {
-        if(deviceMessage.deviceCount) {
-            this.setState({testEnumerate: deviceMessage.deviceCount});
-        }
+    onDisconnected(): void {
     }
 
-    onError(reason:string): void {
+    onEnumerated(status: SIStatus, deviceCount: number): void {
+            this.setState({testEnumerate:""+ deviceCount});
+            this.siGatewayClient.readMessages();
     }
 
-    onMessageRead(devicesMessage: SIMessage[]): void {
+    onError(reason: string): void {
     }
 
-    onPropertyRead(deviceMessage: SIMessage): void {
-        if(deviceMessage.value) {
-            this.setState({testRead: deviceMessage.value});
-        }
+    onMessageRead(status: SIStatus, count: number, messages: SIDeviceMessage[]): void {
+        this.siGatewayClient.readProperty('demo.sol.11004');
+        this.siGatewayClient.readProperties(['demo.sol.11004','demo.sol.11005']);
     }
 
-    onPropertySubscribed(deviceMessage: SIMessage): void {
+    onPropertyRead(status: SIStatus, propertyId: string, value?: string): void {
+        this.setState({testRead: ""+value});
     }
 
-    onPropertyUnsubscribed(deviceMessage: SIMessage): void {
+    onPropertySubscribed(status: SIStatus, propertyId: string): void {
+        this.siGatewayClient.unsubscribeFromProperty('demo.sol.11004');
     }
 
-    onPropertyUpdate(deviceMessage: SIMessage): void {
+    onPropertiesSubscribed(statuses: SISubscriptionsResult[]) {
+        this.siGatewayClient.unsubscribeFromProperties(['demo.sol.11004'])
     }
 
-    onPropertyWritten(deviceMessage: SIMessage): void {
+    onPropertyUnsubscribed(status: SIStatus, propertyId: string): void {
+        this.siGatewayClient.subscribeToProperties(['demo.sol.11004']);
     }
 
-    onConnect(deviceMessage: SIMessage):void {
+    onPropertiesUnsubscribed(statuses: SISubscriptionsResult[]) {
+        this.siGatewayClient.writeProperty('demo.inv.1415');
     }
 
-    onDisconnected():void {
+    onPropertyUpdated(propertyId: string, value: any): void {
     }
+
+    onPropertyWritten(status: SIStatus, propertyId: string): void {
+        this.setState({testRead:"Property written with status:" + status});
+    }
+
+    onPropertiesRead(results: SIPropertyReadResult[]) {
+        this.siGatewayClient.subscribeToProperty('demo.sol.11004');
+    }
+
 }
 
 export default App;
