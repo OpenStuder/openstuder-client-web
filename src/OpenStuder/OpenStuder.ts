@@ -182,7 +182,7 @@ export type SIDeviceMessage={
  */
 class SIProtocolError{
     static raise(error:string){
-        console.log(error);
+        throw new Error(error);
     }
 }
 
