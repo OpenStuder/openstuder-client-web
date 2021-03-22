@@ -1,17 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
-import App from './AppSamples/App';
+import AppSampleMedium from './AppSampleMedium/AppSampleMedium';
 import reportWebVitals from './reportWebVitals';
+import AppSampleSimple from "./AppSampleSimple/AppSampleSimple";
 
+
+//Modify this function to change the example application
 ReactDOM.render(
   <React.StrictMode>
-    <App />
+    <AppSampleMedium />
   </React.StrictMode>,
   document.getElementById('root')
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();

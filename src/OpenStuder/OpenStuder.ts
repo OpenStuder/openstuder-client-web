@@ -209,6 +209,9 @@ class SIAbstractGatewayClient {
         if(lines.length>1){
             command=lines[0];
         }
+        else{
+            SIProtocolError.raise("Invalid frame");
+        }
 
         let line=1;
         while (line<lines.length){
@@ -217,9 +220,19 @@ class SIAbstractGatewayClient {
                 headers.set(components[0],components[1]);
             }
             line +=1;
+            if(lines[line]===""){
+                line +=1;
+                break;
+            }
         }
-        line -=1;
         let body = lines[line];
+        line+=1;
+        while(line<lines.length){
+            if(lines[line]!=="") {
+                body += "\n" + lines[line];
+            }
+            line++;
+        }
 
         return {body: body, headers: headers, command: command};
     }
@@ -678,8 +691,11 @@ class SIAbstractGatewayClient {
      * @param dateTo End date and time to get the logged data to (ISO 8601 extended format)
      * @param limit Number of maximum received messages
      */
-    protected static encodeReadDatalogFrame(propertyId:string, dateFrom?:Date, dateTo?:Date, limit?:number){
-        let frame:string = 'READ DATALOG\nid:' + propertyId + '\n';
+    protected static encodeReadDatalogFrame(propertyId?:string, dateFrom?:Date, dateTo?:Date, limit?:number){
+        let frame:string = 'READ DATALOG\n';
+        if(propertyId){
+            frame += "id:" + propertyId +"\n";
+        }
         frame += SIAbstractGatewayClient.getTimestampHeader('from',dateFrom);
         frame += SIAbstractGatewayClient.getTimestampHeader('to',dateTo);
         if(limit){
@@ -701,9 +717,11 @@ class SIAbstractGatewayClient {
         };
         let decodedFrame: DecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "DATALOG READ" && decodedFrame.headers.has("status" )
-            && decodedFrame.headers.has("id")&& decodedFrame.headers.has("count"))
+            && decodedFrame.headers.has("count"))
         {
-            retVal.id=decodedFrame.headers.get("id");
+            if(decodedFrame.headers.has("id")) {
+                retVal.id = decodedFrame.headers.get("id");
+            }
             retVal.status=decodedFrame.headers.get("status");
             retVal.count=decodedFrame.headers.get("count");
             retVal.body=decodedFrame.body;
@@ -934,6 +952,13 @@ export interface SIGatewayCallback{
     onPropertyUpdated(propertyId:string, value:any):void;
 
     /**
+     * Called when the datalog property list operation started using read_datalog_properties() has completed on the gateway.
+     * @param status Status of the operation.
+     * @param properties List of the IDs of the properties for whom data is available in the data log.
+     */
+    onDatalogPropertiesRead(status:SIStatus,properties:string[]):void;
+
+    /**
      * Called when the datalog read operation started using read_datalog() has completed on the gateway.
      * @param status Status of the operation.
      * @param propertyId ID of the property.
@@ -1118,8 +1143,14 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                         break;
                     case "DATALOG READ":
                         receivedMessage = SIGatewayClient.decodeDatalogReadFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id && receivedMessage.body && receivedMessage.count) {
-                            this.siGatewayCallback.onDatalogRead(SIStatusFromString(receivedMessage.status),receivedMessage.id, +receivedMessage.count, receivedMessage.body);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.body && receivedMessage.count) {
+                            if(receivedMessage.id){
+                                this.siGatewayCallback.onDatalogRead(SIStatusFromString(receivedMessage.status),receivedMessage.id, +receivedMessage.count, receivedMessage.body);
+                            }
+                            else {
+                                let properties = receivedMessage.body.split("\n");
+                                this.siGatewayCallback.onDatalogPropertiesRead(SIStatusFromString(receivedMessage.status), properties);
+                            }
                         }
                         break;
                     case "DEVICE MESSAGE":
@@ -1346,6 +1377,21 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         this.ensureInState(SIConnectionState.CONNECTED);
         if(this.ws) {
             this.ws.send(SIGatewayClient.encodeReadDatalogFrame(propertyId,dateFrom, dateTo, limit));
+        }
+    }
+
+    /**
+     * This method is used to retrieve the list of IDs of all properties for whom data is logged on the gateway.
+     * If a time window is given using from and to, only data in this time windows is considered.
+     * The status of the operation is the list of properties for whom logged data is available are reported
+     * using the onDatalogPropertiesRead() callback.
+     * @param dateFrom Optional date and time of the start of the time window to be considered.
+     * @param dateTo Optional date and time of the end of the time window to be considered.
+     */
+    public readDatalogProperties(dateFrom?:Date,dateTo?:Date){
+        this.ensureInState(SIConnectionState.CONNECTED);
+        if(this.ws){
+            this.ws.send(SIGatewayClient.encodeReadDatalogFrame(undefined,dateFrom,dateTo,undefined))
         }
     }
 
