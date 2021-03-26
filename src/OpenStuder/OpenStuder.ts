@@ -216,10 +216,20 @@ class SIAbstractGatewayClient {
         let line=1;
         while (line<lines.length){
             let components = lines[line].split(":");
+            //General case
             if (components.length===2){
                 headers.set(components[0],components[1]);
             }
+            //if our components has a timestamp, it will have several ':'
+            if(components.length>2){
+                let value="";
+                for(let i=1;i<components.length;i++){
+                    value+=":"+components[i];
+                }
+                headers.set(components[0],value);
+            }
             line +=1;
+            //We don't want to treat the body here, we need to break before
             if(lines[line]===""){
                 line +=1;
                 break;
