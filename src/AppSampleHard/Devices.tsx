@@ -8,6 +8,7 @@ export type DeviceProperty = {
     writeable: boolean,
     type: string,
     unit: string|undefined,
+    subscribed:boolean,
 }
 
 export type Device = {
@@ -43,7 +44,8 @@ class Devices{
                         readable: elementProperty.readable,
                         writeable: elementProperty.writeable,
                         type: elementProperty.type,
-                        unit: elementProperty.unit
+                        unit: elementProperty.unit,
+                        subscribed:false
                     };
                     tempDevice.properties.push(tempProperty);
                 }
@@ -105,18 +107,13 @@ enum typeWidget{
     TEXTBOX
 }
 
-type DWprops={
+type WRprops={
     type:typeWidget,
     id:string,
     onClick:(id:string)=>void,
-    onSubmit:(id:string, value:string)=>void,
-    onSubscribeTask:(id:string, subscribing:boolean)=>void
 }
 
-type DWstate={
-    subscribed:boolean;
-}
-class DeviceWidget extends React.Component<DWprops, DWstate>{
+class WidgetRead extends React.Component<WRprops,{}>{
     inputValue:string;
     constructor(props:any){
         super(props);
@@ -128,6 +125,60 @@ class DeviceWidget extends React.Component<DWprops, DWstate>{
         this.props.onClick(this.props.id);
     }
 
+    public render(){
+        if(this.props.type===typeWidget.BUTTON_READ){
+            return(<button onClick={()=>this.onClick()}> Read </button>);
+        }
+
+        else{
+                return(<div>-</div>);
+            }
+        }
+}
+
+type WSprops={
+    type:typeWidget,
+    id:string,
+    subscribed:boolean,
+    onSubscribeTask:(id:string, subscribing:boolean)=>void
+}
+
+class WidgetSubscribe extends React.Component<WSprops,{}>{
+    constructor(props:any){
+        super(props);
+    }
+
+    public onSubscribeTask(){
+        let subscribed:boolean = !this.props.subscribed;
+        this.props.onSubscribeTask(this.props.id,subscribed);
+    }
+
+    public render(){
+        if(this.props.type===typeWidget.BUTTON_SUBSCRIBE){
+            let label:string= !this.props.subscribed?"Subscribe":"Unsubscribe";
+            return(<button onClick={()=>this.onSubscribeTask()}> {label} </button>)
+        }
+
+        else{
+            return(<div>-</div>);
+        }
+    }
+}
+
+
+type WWprops={
+    type:typeWidget,
+    id:string,
+    onSubmit:(id:string, value:string)=>void,
+}
+class WidgetWrite extends React.Component<WWprops, { }>{
+    inputValue:string;
+    constructor(props:any){
+        super(props);
+        this.inputValue="";
+        this.state={subscribed:false};
+    }
+
     public onSubmit(){
         this.props.onSubmit(this.props.id, this.inputValue);
     }
@@ -136,17 +187,7 @@ class DeviceWidget extends React.Component<DWprops, DWstate>{
         this.inputValue=event.target.value;
     }
 
-    public onSubscribeTask(){
-        let subscribed:boolean = !this.state.subscribed;
-        this.setState({subscribed:subscribed});
-        this.props.onSubscribeTask(this.props.id,subscribed);
-    }
-
     public render(){
-        if(this.props.type===typeWidget.BUTTON_READ){
-            return(<button onClick={()=>this.onClick()}> Read </button>);
-        }
-
         if(this.props.type===typeWidget.TEXTBOX){
             return(
                 <div>
@@ -155,16 +196,10 @@ class DeviceWidget extends React.Component<DWprops, DWstate>{
                 </div>
             );
         }
-
-        if(this.props.type===typeWidget.BUTTON_SUBSCRIBE){
-            let label:string= !this.state.subscribed?"Subscribe":"Unsubscribe";
-            return(<button onClick={()=>this.onSubscribeTask()}> {label} </button>)
-        }
-
         else{
-                return(<div>-</div>);
-            }
+            return(<div>-</div>);
         }
+    }
 }
 
 type DRprops ={
@@ -219,16 +254,16 @@ export class DeviceRender extends React.Component<DRprops, {}>{
                     {""+property.value}
                 </td>
                 <td>
-                    <DeviceWidget type={readButton} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)}
-                                  onSubmit={(id,value) => this.onSubmit(id, value)} onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
+                    <WidgetRead type={readButton} id={this.props.device.id+"."+property.id}
+                                onClick={(id)=>this.onClick(id)}/>
                 </td>
                 <td>
-                    <DeviceWidget type={writeTextBox} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)}
-                                  onSubmit={(id,value) => this.onSubmit(id, value)} onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
+                    <WidgetWrite type={writeTextBox} id={this.props.device.id+"."+property.id}
+                                  onSubmit={(id,value) => this.onSubmit(id, value)} />
                 </td>
                 <td>
-                    <DeviceWidget type={subscribeButton} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)}
-                                  onSubmit={(id,value) => this.onSubmit(id, value)} onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
+                    <WidgetSubscribe type={subscribeButton} id={this.props.device.id+"."+property.id} subscribed={property.subscribed}
+                                     onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
                 </td>
             </tr>
     );

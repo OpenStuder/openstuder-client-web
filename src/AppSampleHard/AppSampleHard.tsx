@@ -122,12 +122,26 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     onPropertySubscribed(status: SIStatus, propertyId: string): void {
+        let newDevices=this.state.devices;
+        let newProperty = newDevices.findPropertyFromString(propertyId);
+        if(newDevices.hasPropertyFromString(propertyId)) {
+            // @ts-ignore function hasProperty has value true
+            newDevices.findPropertyFromString(propertyId).subscribed=true;
+            this.setState({devices:newDevices});
+        }
     }
 
     onPropertiesSubscribed(statuses: SISubscriptionsResult[]) {
     }
 
     onPropertyUnsubscribed(status: SIStatus, propertyId: string): void {
+        let newDevices=this.state.devices;
+        let newProperty = newDevices.findPropertyFromString(propertyId);
+        if(newDevices.hasPropertyFromString(propertyId)) {
+            // @ts-ignore function hasProperty has value true
+            newDevices.findPropertyFromString(propertyId).subscribed=false;
+            this.setState({devices:newDevices});
+        }
     }
 
     onPropertiesUnsubscribed(statuses: SISubscriptionsResult[]) {
