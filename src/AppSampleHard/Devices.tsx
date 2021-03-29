@@ -1,4 +1,4 @@
-import React, {ChangeEvent, FormEvent} from "react";
+import React from "react";
 
 export type DeviceProperty = {
     value: string|undefined,
@@ -100,7 +100,8 @@ class Devices{
 
 enum typeWidget{
     NONE,
-    BUTTON,
+    BUTTON_READ,
+    BUTTON_SUBSCRIBE,
     TEXTBOX
 }
 
@@ -109,12 +110,18 @@ type DWprops={
     id:string,
     onClick:(id:string)=>void,
     onSubmit:(id:string, value:string)=>void,
+    onSubscribeTask:(id:string, subscribing:boolean)=>void
 }
-class DeviceWidget extends React.Component<DWprops, {}>{
+
+type DWstate={
+    subscribed:boolean;
+}
+class DeviceWidget extends React.Component<DWprops, DWstate>{
     inputValue:string;
     constructor(props:any){
         super(props);
         this.inputValue="";
+        this.state={subscribed:false};
     }
 
     public onClick(){
@@ -129,24 +136,29 @@ class DeviceWidget extends React.Component<DWprops, {}>{
         this.inputValue=event.target.value;
     }
 
+    public onSubscribeTask(){
+        let subscribed:boolean = !this.state.subscribed;
+        this.setState({subscribed:subscribed});
+        this.props.onSubscribeTask(this.props.id,subscribed);
+    }
+
     public render(){
-        if(this.props.type===typeWidget.BUTTON){
+        if(this.props.type===typeWidget.BUTTON_READ){
             return(<button onClick={()=>this.onClick()}> Read </button>);
         }
 
         if(this.props.type===typeWidget.TEXTBOX){
-            /*
-                    <input type="text" form={this.props.id} value={this.inputValue} onChange={this.handleChange}> </input>
-                    <input type="submit" value="send"/>
-            */
-            console.log("trying to display the input now:");
             return(
                 <div>
                     <input type="text" name="value" form="form" onChange={(event => this.onChange(event))}/>
                     <input type="submit" value="send" form="form" onClick={()=>this.onSubmit()}/>
                 </div>
+            );
+        }
 
-        );
+        if(this.props.type===typeWidget.BUTTON_SUBSCRIBE){
+            let label:string= !this.state.subscribed?"Subscribe":"Unsubscribe";
+            return(<button onClick={()=>this.onSubscribeTask()}> {label} </button>)
         }
 
         else{
@@ -158,14 +170,13 @@ class DeviceWidget extends React.Component<DWprops, {}>{
 type DRprops ={
     device:Device,
     onClick:(id:string)=>void,
-    onSubmit:(id:string, value:string)=>void
+    onSubmit:(id:string, value:string)=>void,
+    onSubscribeTask:(id:string, subscribing:boolean)=>void
 }
 
 export class DeviceRender extends React.Component<DRprops, {}>{
-    inputValue:string;
     constructor(props:any) {
         super(props);
-        this.inputValue="";
     }
 
     public onClick(id:string){
@@ -176,11 +187,16 @@ export class DeviceRender extends React.Component<DRprops, {}>{
         this.props.onSubmit(id,value);
     }
 
+    public onSubscribeTask(id:string, subscribing:boolean){
+        this.props.onSubscribeTask(id,subscribing);
+    }
+
     public renderProperty(property:DeviceProperty, id:string){
         let readButton:typeWidget;
         let writeTextBox:typeWidget;
+        let subscribeButton:typeWidget = typeWidget.BUTTON_SUBSCRIBE;
         if(property.readable===true){
-            readButton = typeWidget.BUTTON;
+            readButton = typeWidget.BUTTON_READ;
         }
         else{
             readButton = typeWidget.NONE;
@@ -203,10 +219,16 @@ export class DeviceRender extends React.Component<DRprops, {}>{
                     {""+property.value}
                 </td>
                 <td>
-                    <DeviceWidget type={readButton} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)} onSubmit={(id,value) => this.onSubmit(id, value)}/>
+                    <DeviceWidget type={readButton} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)}
+                                  onSubmit={(id,value) => this.onSubmit(id, value)} onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
                 </td>
                 <td>
-                    <DeviceWidget type={writeTextBox} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)} onSubmit={(id,value) => this.onSubmit(id, value)}/>
+                    <DeviceWidget type={writeTextBox} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)}
+                                  onSubmit={(id,value) => this.onSubmit(id, value)} onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
+                </td>
+                <td>
+                    <DeviceWidget type={subscribeButton} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)}
+                                  onSubmit={(id,value) => this.onSubmit(id, value)} onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
                 </td>
             </tr>
     );
@@ -233,6 +255,9 @@ export class DeviceRender extends React.Component<DRprops, {}>{
                     <th scope="col">
                         Write Property
                     </th>
+                    <th scope="col">
+                        Subscribe
+                    </th>
                 </tr>
                 {this.props.device.properties.map(property => {
                     let id:string = this.props.device.id+"."+property.id;
@@ -243,15 +268,3 @@ export class DeviceRender extends React.Component<DRprops, {}>{
 }
 
 export default Devices;
-
-/*
-*               <td>
-                    <DeviceWidget type={readButton} id={id} onClick={this.onClick} onSubmit={this.onSubmit}/>
-                </td>
-                <td>
-                    <DeviceWidget type={writeTextBox} id={this.props.device.id+"."+property.id} onClick={(id)=>this.onClick(id)} onSubmit={(id,value)=>this.onSubmit(id,value)}/>
-                </td>
-
-
-
-*/

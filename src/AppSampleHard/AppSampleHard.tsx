@@ -60,6 +60,15 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         this.siGatewayClient.writeProperty("xcom."+id,value);
     }
 
+    public onSubscribeTask(id:string, subscribing:boolean){
+        if(subscribing){
+            this.siGatewayClient.subscribeToProperty("xcom."+id);
+        }
+        else{
+            this.siGatewayClient.unsubscribeFromProperty("xcom."+id);
+        }
+    }
+
     onPropertyRead(status: SIStatus, propertyId: string, value?: string): void {
         let newDevices=this.state.devices;
         let newProperty = newDevices.findPropertyFromString(propertyId);
@@ -98,6 +107,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         this.setState({messages:messages});
     }
 
+
     onDisconnected(): void {
     }
 
@@ -124,7 +134,13 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     onPropertyUpdated(propertyId: string, value: any): void {
-
+        let newDevices=this.state.devices;
+        let newProperty = newDevices.findPropertyFromString(propertyId);
+        if(newDevices.hasPropertyFromString(propertyId)) {
+            // @ts-ignore function hasProperty has value true
+            newDevices.findPropertyFromString(propertyId).value=value;
+            this.setState({devices:newDevices});
+        }
     }
 
     onPropertyWritten(status: SIStatus, propertyId: string): void {
@@ -179,7 +195,6 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     public renderSidebar(){
-        let count = this.state.devices.devices.length;
         return(
             <div>
                 <div className="sidenav">
@@ -238,7 +253,8 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         let batteryDevice:Device|undefined=this.state.devices.findDevice(61);
         if(batteryDevice) {
             return (
-                <DeviceRender device={batteryDevice} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmit}/>
+                <DeviceRender device={batteryDevice} onClick={(id:string)=>this.onClick(id)} onSubmit={(id,value)=>this.onSubmit(id,value)}
+                              onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
             );
         }
         else{
@@ -253,7 +269,8 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
             <div>
                 {this.state.devices.devices.map(device=>{
                     if(device.model.includes("VarioTrack")){
-                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmit}/>
+                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmit}
+                                             onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
                     }
                 })}
             </div>
@@ -265,15 +282,14 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
             <div>
                 {this.state.devices.devices.map(device=>{
                     if(device.model.includes("Xtender")){
-                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmit}/>
+                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmit}
+                                             onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
                     }
                 })}
             </div>
         );
     }
 }
-
-
 
 export default AppSampleHard;
 
