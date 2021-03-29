@@ -2,7 +2,7 @@ import React from 'react';
 import './AppSampleMedium.css';
 import logo from "../OpenStuder.svg";
 
-import HighchartsTimeSeries from "./HighchartsTimeSeries";
+import HighchartsTimeSeries from "../HighchartsTimeSeries";
 
 import {
     SIAccessLevel,

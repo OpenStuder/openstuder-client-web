@@ -6,7 +6,7 @@ import { ChartObject } from 'highcharts';
 const Boost = require('highcharts/modules/boost');
 Boost(Highcharts); // WebGL-backed rendering (https://www.highcharts.com/blog/tutorials/higcharts-boost-module/)
 
-const slidingTimeWindowSec = 50;
+const slidingTimeWindowSec = 500;
 
 type Data = {
     readonly timestamp: number,
@@ -35,7 +35,7 @@ class HighchartsTimeSeries extends React.Component<Props, {}> {
         });
         this.chart = Highcharts.chart(this.renderToId, {
             title: {
-                text: 'Live Data via WebSocket'
+                text: 'Total power'
             },
             xAxis: {
                 type: 'datetime'
