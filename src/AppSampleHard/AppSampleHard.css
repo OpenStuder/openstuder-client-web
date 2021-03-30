@@ -46,6 +46,7 @@ th {
 
 td {
   text-align: center;
+  font-size:calc(2px + 2vmin);
 }
 
 tr:nth-child(even) {
@@ -106,4 +107,8 @@ table {
   margin-left: 160px; /* Same as the width of the sidebar */
   padding: 0px 10px;
   justify-content: left;
+}
+
+.subLink{
+  margin-left: 4px;
 }

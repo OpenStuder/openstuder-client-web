@@ -273,7 +273,7 @@ export class DeviceRender extends React.Component<DRprops, {}>{
     public render() {
         return (
             <div>
-                <h2>
+                <h2 id={this.props.device.model}>
                     {this.props.device.model} with ID {this.props.device.id}
                 </h2>
                 <tr>

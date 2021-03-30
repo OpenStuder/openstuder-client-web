@@ -16,6 +16,7 @@ import {
 
 import Devices, {Device, DeviceRender} from "./Devices";
 import DeviceMessagesRender from "./DeviceMessageRender";
+import SystemInfo from "./SystemInfo";
 
 const host:string="ws://153.109.24.113";
 const port:number=1987;
@@ -39,10 +40,12 @@ type AppState={
 class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayCallback{
 
     siGatewayClient:SIGatewayClient;
+    driverId:string;
 
     constructor(props:any) {
         super(props);
         this.siGatewayClient = new SIGatewayClient();
+        this.driverId="";
         this.state={
             currentView:VIEW.SystemInfo,
             devices: new Devices(),
@@ -58,19 +61,19 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     public onClick(id:string){
-        this.siGatewayClient.readProperty("xcom." + id);
+        this.siGatewayClient.readProperty(this.driverId+"."+id);
     }
 
     public onSubmit(id:string, value:string){
-        this.siGatewayClient.writeProperty("xcom."+id,value);
+        this.siGatewayClient.writeProperty(this.driverId+"."+id);
     }
 
     public onSubscribeTask(id:string, subscribing:boolean){
         if(subscribing){
-            this.siGatewayClient.subscribeToProperty("xcom."+id);
+            this.siGatewayClient.subscribeToProperty(this.driverId+"."+id);
         }
         else{
-            this.siGatewayClient.unsubscribeFromProperty("xcom."+id);
+            this.siGatewayClient.unsubscribeFromProperty(this.driverId+"."+id);
         }
     }
 
@@ -107,6 +110,8 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     onDescription(status: SIStatus, description: string, id?: string): void {
         let newDevices:Devices=new Devices(Devices.jsonToDevices(description));
         this.setState({devices:newDevices});
+        let pJSON = JSON.parse(description);
+        this.driverId = pJSON.instances[0].id;
     }
 
     onDeviceMessage(message: SIDeviceMessage): void {
@@ -114,7 +119,6 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         messages.push(message);
         this.setState({messages:messages});
     }
-
 
     onDisconnected(): void {
     }
@@ -129,6 +133,10 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
 
     }
 
+    public changeView(newView:VIEW){
+        this.setState({currentView:newView});
+    }
+
     onPropertySubscribed(status: SIStatus, propertyId: string): void {
         let newDevices=this.state.devices;
         let newProperty = newDevices.findPropertyFromString(propertyId);
@@ -140,6 +148,14 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     onPropertiesSubscribed(statuses: SISubscriptionsResult[]) {
+        let newDevices=this.state.devices;
+        statuses.map(status =>{
+            if(status.status===SIStatus.SUCCESS && newDevices.hasPropertyFromString(status.id)){
+                // @ts-ignore function hasProperty has value true
+                newDevices.findPropertyFromString(status.id).subscribed=true;
+            }
+        });
+        this.setState({devices:newDevices});
     }
 
     onPropertyUnsubscribed(status: SIStatus, propertyId: string): void {
@@ -153,6 +169,14 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     onPropertiesUnsubscribed(statuses: SISubscriptionsResult[]) {
+        let newDevices=this.state.devices;
+        statuses.map(status =>{
+            if(status.status===SIStatus.SUCCESS && newDevices.hasPropertyFromString(status.id)){
+                // @ts-ignore function hasProperty has value true
+                newDevices.findPropertyFromString(status.id).subscribed=false;
+            }
+        });
+        this.setState({devices:newDevices});
     }
 
     onPropertyUpdated(propertyId: string, value: any): void {
@@ -169,7 +193,14 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     onPropertiesRead(results: SIPropertyReadResult[]) {
-
+        let newDevices=this.state.devices;
+        results.map(result =>{
+            if(result.status===SIStatus.SUCCESS && newDevices.hasPropertyFromString(result.id)){
+                // @ts-ignore function hasProperty has value true
+                newDevices.findPropertyFromString(result.id).value=result.value;
+            }
+        });
+        this.setState({devices:newDevices});
     }
 
     public render() {
@@ -197,10 +228,6 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         );
     }
 
-    public changeView(newView:VIEW){
-        this.setState({currentView:newView});
-    }
-
     public renderConnected(){
         return (
             <div className="App">
@@ -217,14 +244,36 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     public renderSidebar(){
+        let varioTrackMCSubLink;
+        let varioTrackVT65SubLink;
+        let xTenderXTSSubLink;
+        let xTenderMCSubLink;
+        this.state.devices.devices.map(device=>{
+            if(device.model.includes("VarioTrack VT-65")){
+                varioTrackVT65SubLink=<a className="subLink" href={"#"+device.model} onClick={()=>this.changeView(VIEW.VarioTrack)}>-{device.model}</a>
+            }
+            if(device.model.includes("Xtender XTS")){
+                xTenderXTSSubLink=<a className="subLink" href={"#"+device.model} onClick={()=>this.changeView(VIEW.XTender)}>-{device.model}</a>
+            }
+            if(device.model.includes("VarioTrack multicast")){
+                varioTrackMCSubLink=<a className="subLink" href={"#"+device.model} onClick={()=>this.changeView(VIEW.VarioTrack)}>-{device.model}</a>
+            }
+            if(device.model.includes("Xtender multicast")){
+                xTenderMCSubLink=<a className="subLink" href={"#"+device.model} onClick={()=>this.changeView(VIEW.XTender)}>-{device.model}</a>
+            }
+        });
         return(
             <div>
                 <div className="sidenav">
-                    <a href="#SystemInfo" onClick={()=>this.changeView(VIEW.SystemInfo)}>System info</a>
-                    <a href="#EventRecord" onClick={()=>this.changeView(VIEW.EventsRecord)}>Notification center</a>
-                    <a href="#Battery" onClick={()=>this.changeView(VIEW.Battery)}>Battery</a>
-                    <a href="#VarioTrack" onClick={()=>this.changeView(VIEW.VarioTrack)}>VarioTrack</a>
-                    <a href="#Xtender" onClick={()=>this.changeView(VIEW.XTender)}>XTender</a>
+                    <a href="#" onClick={()=>this.changeView(VIEW.SystemInfo)}>System info</a>
+                    <a href="#" onClick={()=>this.changeView(VIEW.EventsRecord)}>Notification center</a>
+                    <a href="#" onClick={()=>this.changeView(VIEW.Battery)}>Battery</a>
+                    <a href="#" onClick={()=>this.changeView(VIEW.VarioTrack)}>VarioTrack</a>
+                    {varioTrackVT65SubLink}
+                    {varioTrackMCSubLink}
+                    <a href="#" onClick={()=>this.changeView(VIEW.XTender)}>XTender</a>
+                    {xTenderXTSSubLink}
+                    {xTenderMCSubLink}
                 </div>
             </div>
         );
@@ -256,10 +305,11 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     public renderSystemInfo(){
+        let batteryDevice = this.state.devices.findDevice(61);
+        let varioTrackDevice = this.state.devices.findDevice(21);
+        let xTenderDevice = this.state.devices.findDevice(11);
         return(
-            <div>
-
-            </div>
+            <SystemInfo  battery={batteryDevice} varioTrack={varioTrackDevice} xTender={xTenderDevice}/>
         );
     }
 
