@@ -1,4 +1,4 @@
-import React, {ChangeEvent, FormEvent} from 'react';
+import React from 'react';
 import './AppSampleHard.css';
 import logo from "../OpenStuder.svg";
 
@@ -16,6 +16,11 @@ import {
 
 import Devices, {Device, DeviceRender} from "./Devices";
 import DeviceMessagesRender from "./DeviceMessageRender";
+
+const host:string="ws://153.109.24.113";
+const port:number=1987;
+const user:string="basic";
+const password:string="basic";
 
 enum VIEW{
     SystemInfo,
@@ -49,7 +54,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         //Set the callback that the SIGatewayClient will call
         this.siGatewayClient.setCallback(this);
         //Try to connect with the server
-        this.siGatewayClient.connect("ws://153.109.24.113",1987, "basic", "basic");
+        this.siGatewayClient.connect(host,port, user, password);
     }
 
     public onClick(id:string){
@@ -72,7 +77,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     onPropertyRead(status: SIStatus, propertyId: string, value?: string): void {
         let newDevices=this.state.devices;
         let newProperty = newDevices.findPropertyFromString(propertyId);
-        if(newDevices.hasPropertyFromString(propertyId)) {
+        if(newDevices.hasPropertyFromString(propertyId) && status===SIStatus.SUCCESS) {
             // @ts-ignore function hasProperty has value true
             newDevices.findPropertyFromString(propertyId).value=value;
             this.setState({devices:newDevices});
@@ -80,6 +85,9 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     onConnectionStateChanged(state: SIConnectionState): void {
+        if(state===SIConnectionState.DISCONNECTED){
+            this.siGatewayClient.connect(host,port, user, password);
+        }
     }
 
 
@@ -124,7 +132,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     onPropertySubscribed(status: SIStatus, propertyId: string): void {
         let newDevices=this.state.devices;
         let newProperty = newDevices.findPropertyFromString(propertyId);
-        if(newDevices.hasPropertyFromString(propertyId)) {
+        if(newDevices.hasPropertyFromString(propertyId) && status===SIStatus.SUCCESS) {
             // @ts-ignore function hasProperty has value true
             newDevices.findPropertyFromString(propertyId).subscribed=true;
             this.setState({devices:newDevices});
@@ -137,7 +145,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     onPropertyUnsubscribed(status: SIStatus, propertyId: string): void {
         let newDevices=this.state.devices;
         let newProperty = newDevices.findPropertyFromString(propertyId);
-        if(newDevices.hasPropertyFromString(propertyId)) {
+        if(newDevices.hasPropertyFromString(propertyId) && status===SIStatus.SUCCESS) {
             // @ts-ignore function hasProperty has value true
             newDevices.findPropertyFromString(propertyId).subscribed=false;
             this.setState({devices:newDevices});
