@@ -242,6 +242,8 @@ export class DeviceRender extends React.Component<DRprops, {}>{
         else{
             writeTextBox = typeWidget.NONE;
         }
+        let value:string=property.value?""+property.value:"-";
+        value += property.unit?" ["+property.unit+"]":"";
         return(
             <tr>
                 <td>
@@ -251,7 +253,7 @@ export class DeviceRender extends React.Component<DRprops, {}>{
                     {property.description}
                 </td>
                 <td>
-                    {""+property.value}
+                    {value}
                 </td>
                 <td>
                     <WidgetRead type={readButton} id={this.props.device.id+"."+property.id}

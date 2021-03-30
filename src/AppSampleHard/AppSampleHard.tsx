@@ -306,14 +306,3 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
 }
 
 export default AppSampleHard;
-
-
-/*
-return(
-    <div className="content">
-        {this.state.devices.devices.map(device => {
-            return <DeviceRender device={device}/>
-        })}
-    </div>
-);
-*/
