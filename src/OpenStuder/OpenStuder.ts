@@ -773,11 +773,11 @@ class SIAbstractGatewayClient {
             let jsonBody=JSON.parse(decodedFrame.body);
             for(let i =0; i<jsonBody.length;i++){
                 let message:SIInformation={
-                    timestamp: jsonBody.timestamp,
-                    accessId: jsonBody.accessId,
-                    deviceId: jsonBody.deviceId,
-                    messageId: jsonBody.messageId,
-                    message: jsonBody.message
+                    timestamp: jsonBody[i].timestamp,
+                    accessId: jsonBody[i].access_id,
+                    deviceId: jsonBody[i].device_id,
+                    messageId: jsonBody[i].message_id,
+                    message: jsonBody[i].message
                 }
                 retVal.push(message);
             }
