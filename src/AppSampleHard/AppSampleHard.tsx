@@ -64,8 +64,12 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         this.siGatewayClient.readProperty(this.driverId+"."+id);
     }
 
-    public onSubmit(id:string, value:string){
+    public onSubmitWrittenTask(id:string, value:string){
         this.siGatewayClient.writeProperty(this.driverId+"."+id);
+    }
+
+    public onSubmitReadMessagesTask(dateFrom:Date|undefined,dateTo:Date|undefined){
+        this.siGatewayClient.readMessages(dateFrom,dateTo);
     }
 
     public onSubscribeTask(id:string, subscribing:boolean){
@@ -130,7 +134,13 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     }
 
     onMessageRead(status: SIStatus, count: number, messages: SIDeviceMessage[]): void {
-
+        if(status===SIStatus.SUCCESS){
+            let newMessages:SIDeviceMessage[]=this.state.messages;
+            messages.map(message=>{
+                newMessages.push(message);
+            });
+            this.setState({messages:newMessages});
+        }
     }
 
     public changeView(newView:VIEW){
@@ -316,7 +326,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
     public renderEventsRecord(){
         return(
             <div>
-                <DeviceMessagesRender messages={this.state.messages}/>
+                <DeviceMessagesRender messages={this.state.messages} onSubmit={(dateFrom, dateTo) => this.onSubmitReadMessagesTask(dateFrom,dateTo)}/>
             </div>
         );
     }
@@ -325,7 +335,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
         let batteryDevice:Device|undefined=this.state.devices.findDevice(61);
         if(batteryDevice) {
             return (
-                <DeviceRender device={batteryDevice} onClick={(id:string)=>this.onClick(id)} onSubmit={(id,value)=>this.onSubmit(id,value)}
+                <DeviceRender device={batteryDevice} onClick={(id:string)=>this.onClick(id)} onSubmit={(id,value)=>this.onSubmitWrittenTask(id,value)}
                               onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
             );
         }
@@ -341,7 +351,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
             <div>
                 {this.state.devices.devices.map(device=>{
                     if(device.model.includes("VarioTrack")){
-                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmit}
+                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmitWrittenTask}
                                              onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
                     }
                 })}
@@ -354,7 +364,7 @@ class AppSampleHard extends React.Component<{ }, AppState> implements SIGatewayC
             <div>
                 {this.state.devices.devices.map(device=>{
                     if(device.model.includes("Xtender")){
-                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmit}
+                        return <DeviceRender device={device} onClick={(id:string)=>this.onClick(id)} onSubmit={()=>this.onSubmitWrittenTask}
                                              onSubscribeTask={(id,subscribing)=>this.onSubscribeTask(id,subscribing)}/>
                     }
                 })}
