@@ -631,7 +631,7 @@ class SIAbstractGatewayClient {
         frame += SIAbstractGatewayClient.getTimestampHeader('from', dateFrom);
         frame += SIAbstractGatewayClient.getTimestampHeader('to', dateTo);
         if (limit) {
-            frame += 'limit:' + limit;
+            frame += 'limit:' + limit + '\n';
         }
         frame += '\n';
         return frame;
@@ -675,7 +675,7 @@ class SIAbstractGatewayClient {
         frame += SIAbstractGatewayClient.getTimestampHeader('from', dateFrom);
         frame += SIAbstractGatewayClient.getTimestampHeader('to', dateTo);
         if (limit) {
-            frame += 'limit:' + limit;
+            frame += 'limit:' + limit + '\n';
         }
         frame += '\n';
         return frame;
@@ -758,7 +758,7 @@ class SIAbstractGatewayClient {
      */
     static getTimestampHeader(key, timestamp) {
         if (timestamp) {
-            return key + ':' + timestamp.toISOString();
+            return key + ':' + timestamp.toISOString() + '\n';
         }
         else {
             return '';
