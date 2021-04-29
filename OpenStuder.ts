@@ -152,6 +152,7 @@ type SIInformation={
     count?:string,
     timestamp?:string,
     gatewayVersion?:string,
+    listProperty?:string[]
 }
 
 /**
@@ -397,6 +398,46 @@ class SIAbstractGatewayClient {
     }
 
     /**
+     * Encode a find property frame to send, support wildcard char
+     * @param propertyId Property to be read
+     */
+    protected static encodeFindPropertiesFrame(propertyId:string){
+        return "FIND PROPERTIES\nid:"+propertyId+"\n\n";
+    }
+
+    /**
+     * Decode a find property frame into a "SIInformation" instance
+     * @param frame Frame to be decoded
+     */
+    protected static decodePropertiesFoundFrame(frame:string):SIInformation{
+        let retVal:SIInformation={
+            listProperty:undefined,
+            status:undefined,
+            id:undefined,
+            count:undefined
+        };
+        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        if(decodedFrame.command==="PROPERTIES FOUND" && decodedFrame.headers.has("status")
+            && decodedFrame.headers.has("id")){
+            let status = decodedFrame.headers.get("status");
+            retVal.status=status;
+            retVal.count=decodedFrame.headers.get("count");
+            if(status==="Success"){
+                retVal.id=decodedFrame.headers.get("id");
+                retVal.listProperty = JSON.parse(decodedFrame.body);
+            }
+        }
+        else if(decodedFrame.command==="ERROR"){
+            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
+        }
+        else{
+            SIProtocolError.raise("unknown error during find properties");
+        }
+        return retVal;
+    }
+
+
+    /**
      * Encode a read property frame to receive the current value of a property
      * @param propertyId Property to be read
      */
@@ -412,7 +453,7 @@ class SIAbstractGatewayClient {
         let retVal:SIInformation= {
             status:undefined,
             id:undefined,
-            value:undefined,
+            value:undefined
         };
         let decodedFrame:DecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="PROPERTY READ" && decodedFrame.headers.has("status")
@@ -904,6 +945,15 @@ export interface SIGatewayCallback{
     onDescription(status:SIStatus, description:string, id?:string):void;
 
     /**
+     * Called when the gateway returned the list of found properties requested using the findProperties() method.
+     * @param status Status of the find operation.
+     * @param id The searched ID (including wildcard character).
+     * @param count The number of properties found.
+     * @param properties List of the property IDs
+     */
+    onPropertiesFound(status:SIStatus, id:string, count:number, properties:string[]): void;
+
+    /**
      * Called when the property read operation started using read_property() has completed on the gateway.
      * @param status Status of the read operation.
      * @param propertyId ID of the property read.
@@ -1098,8 +1148,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                     case "DESCRIPTION":
                         receivedMessage = SIGatewayClient.decodeDescriptionFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.body) {
-                            //status: SIStatus, id_: Optional[str], description: object
                             this.siGatewayCallback.onDescription(SIStatusFromString(receivedMessage.status),receivedMessage.body,receivedMessage.id);
+                        }
+                        break;
+                    case "PROPERTIES FOUND":
+                        receivedMessage = SIGatewayClient.decodePropertiesFoundFrame(event.data);
+                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id && receivedMessage.count && receivedMessage.listProperty){
+                            this.siGatewayCallback.onPropertiesFound(SIStatusFromString(receivedMessage.status), receivedMessage.id, +receivedMessage.count, receivedMessage.listProperty);
                         }
                         break;
                     case "PROPERTY READ":
@@ -1267,6 +1322,23 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         this.ensureInState(SIConnectionState.CONNECTED);
         if(this.ws) {
             this.ws.send(SIGatewayClient.encodeDescribeFrame(deviceAccessId,deviceId,propertyId, flags));
+        }
+    }
+    /**
+     * This method is used to retrieve a list of existing properties that match the given property ID in the form
+     *"<device access ID>.<device ID>.<property ID>". The wildcard character "*" is supported for <device access ID> and
+     * <device ID> fields.
+     * For example "*.inv.3136" represents all properties with ID 3136 on the device with ID "inv" connected through any
+     * device access, "demo.*.3136" represents all properties with ID 3136 on any device that disposes that property
+     * connected through the device access "demo" and finally "*.*.3136" represents all properties with ID 3136 on any
+     * device that disposes that property connected through any device access.
+     * @param property_id: The search wildcard ID.
+     * @raises SIProtocolError: On a connection, protocol of framing error.
+     */
+    public findProperties(propertyId:string){
+        this.ensureInState(SIConnectionState.CONNECTED);
+        if(this.ws){
+            this.ws.send(SIGatewayClient.encodeFindPropertiesFrame(propertyId));
         }
     }
 

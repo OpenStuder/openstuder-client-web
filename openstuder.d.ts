@@ -48,6 +48,8 @@ declare namespace OpenStuder {
 
         onDescription(status: SIStatus, description: string, id?: string): void;
 
+        onPropertiesFound(status:SIStatus, id:string, count:number, properties:string[]): void;
+
         onPropertyRead(status: SIStatus, propertyId: string, value?: string): void;
 
         onPropertiesRead(results: SIPropertyReadResult[]): void;
@@ -100,6 +102,8 @@ declare namespace OpenStuder {
         public enumerate();
 
         public describe(deviceAccessId?: string, deviceId?: string, propertyId?: number, flags?: SIDescriptionFlags[]);
+
+        public findProperties(propertyId:string);
 
         public readProperty(propertyId: string);
 
