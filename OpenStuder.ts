@@ -1265,7 +1265,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
             this.accessLevel = SIAccessLevel.NONE;
         }
         this.ws.onerror = (event:Event)=>{
-            SIProtocolError.raise("Error occurs on the websocket");
+            this.siGatewayCallback?.onError("Error occurs on the websocket");
         }
     }
 
