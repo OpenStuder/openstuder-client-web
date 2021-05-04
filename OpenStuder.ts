@@ -1263,6 +1263,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         this.ws.onclose = (/*event:Event*/)=>{
             this.setStateSI(SIConnectionState.DISCONNECTED);
             this.accessLevel = SIAccessLevel.NONE;
+            this.siGatewayCallback?.onDisconnected();
         }
         this.ws.onerror = (event:Event)=>{
             this.siGatewayCallback?.onError("Error occurs on the websocket");
