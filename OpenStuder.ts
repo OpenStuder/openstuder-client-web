@@ -254,7 +254,7 @@ class SIAbstractGatewayClient {
      * @param password Password for the user
      */
     protected static encodeAuthorizeFrame(user?:string, password?:string):string{
-        if(user===undefined || password === undefined) {
+        if(user!==undefined || password !== undefined) {
             return "AUTHORIZE\nuser:" + user + "\npassword:" + password + "\nprotocol_version:1\n\n";
         }
         else{
@@ -1109,7 +1109,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         this.setStateSI(SIConnectionState.CONNECTING);
         this.ws.onopen = (/*event:Event*/)=>{
             this.setStateSI(SIConnectionState.AUTHORIZING);
-            let frame = SIGatewayClient.encodeAuthorizeFrame(user,password);
+            let frame = SIGatewayClient.encodeAuthorizeFrame(this.user, this.password);
             if(this.ws){
                 this.ws.send(frame);
             }
