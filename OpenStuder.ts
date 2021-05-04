@@ -1118,18 +1118,27 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
             let command: string = SIGatewayClient.peekFrameCommand(event.data);
             let receivedMessage:SIInformation;
             // In AUTHORIZE state, we only handle AUTHORIZED messages
-            if(this.state===SIConnectionState.AUTHORIZING && command ==="AUTHORIZED"){
-                this.setStateSI(SIConnectionState.CONNECTED);
-                receivedMessage = SIGatewayClient.decodeAuthorizedFrame(event.data);
-                if(receivedMessage.accessLevel) {
-                    this.accessLevel = SIAccessLevelFromString(receivedMessage.accessLevel);
+            if(this.state===SIConnectionState.AUTHORIZING){
+                if (command === "AUTHORIZED") {
+                    this.setStateSI(SIConnectionState.CONNECTED);
+                    receivedMessage = SIGatewayClient.decodeAuthorizedFrame(event.data);
+                    if (receivedMessage.accessLevel) {
+                        this.accessLevel = SIAccessLevelFromString(receivedMessage.accessLevel);
+                    }
+                    if (receivedMessage.gatewayVersion) {
+                        this.gatewayVersion = receivedMessage.gatewayVersion;
+                    }
+                    if (this.siGatewayCallback && receivedMessage.accessLevel && receivedMessage.gatewayVersion) {
+                        this.siGatewayCallback.onConnected(SIAccessLevelFromString(receivedMessage.accessLevel), receivedMessage.gatewayVersion);
+                    }
+                } else if (command === "ERROR") {
+                    if(this.siGatewayCallback) {
+                        this.siGatewayCallback.onError("" + SIGatewayClient.decodeFrame(event.data).headers.get("reason"))
+                    }
+                    this.ws?.close();
+                    this.state = SIConnectionState.DISCONNECTED;
                 }
-                if(receivedMessage.gatewayVersion){
-                    this.gatewayVersion=receivedMessage.gatewayVersion;
-                }
-                if(this.siGatewayCallback && receivedMessage.accessLevel && receivedMessage.gatewayVersion) {
-                    this.siGatewayCallback.onConnected(SIAccessLevelFromString(receivedMessage.accessLevel),receivedMessage.gatewayVersion);
-                }
+
             }
             else if(this.state===SIConnectionState.CONNECTED){
                 switch (command) {
