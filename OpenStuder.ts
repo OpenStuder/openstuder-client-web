@@ -43,7 +43,7 @@ export enum SIStatus {
     INVALID_VALUE = -6
 }
 
-function statusFromString(str: string): SIStatus {
+function statusFromString(str?: string): SIStatus {
     switch (str) {
         case "Success":
             return SIStatus.SUCCESS;
