@@ -124,19 +124,6 @@ export enum SIWriteFlags {
 }
 
 /**
- * A received frame will be treated as this type to separate his information
- *
- * -command : The first line of the frame which indicates the actual information
- * -body : Contain information which are better to treat with a JSON format
- * -headers : Contain basic information of the frame
- */
-type DecodedFrame={
-    command:string,
-    body:string,
-    headers:Map<string,string>
-}
-
-/**
  * @class SIProtocolError
  * Class for reporting all OpenStuder protocol errors.
  */
@@ -149,6 +136,37 @@ class SIProtocolError extends Error {
     static raise(message: string) {
         throw new SIProtocolError(message);
     }
+}
+
+/**
+ * The SIDeviceMessage class represents a message a device connected to the OpenStuder gateway has broadcast.
+ */
+export type SIDeviceMessage = { // TODO: Create class.
+
+    /**
+     * Timestamp when the device message was received by the gateway.
+     */
+    timestamp: string // TODO: Better type would be Date.
+
+    /**
+     * ID of the device access driver that received the message.
+     */
+    accessId: string,
+
+    /**
+     * ID of the device that broadcast the message.
+     */
+    deviceId: string,
+
+    /**
+     * Message ID.
+     */
+    messageId: string,
+
+    /**
+     * String representation of the message.
+     */
+    message: string
 }
 
 /**
@@ -172,6 +190,19 @@ type SIInformation={
 }
 
 /**
+ * A received frame will be treated as this type to separate his information
+ *
+ * -command : The first line of the frame which indicates the actual information
+ * -body : Contain information which are better to treat with a JSON format
+ * -headers : Contain basic information of the frame
+ */
+type DecodedFrame={
+    command:string,
+    body:string,
+    headers:Map<string,string>
+}
+
+/**
  * The SIDPropertyReadResult class represents the status of a property read result.
  */
 export type SIPropertyReadResult={
@@ -186,17 +217,6 @@ export type SIPropertyReadResult={
 export type SISubscriptionsResult={
     status:SIStatus,
     id:string,
-}
-
-/**
- * The SIDeviceMessage class represents a message a device connected to the OpenStuder gateway has broadcast.
- */
-export type SIDeviceMessage={
-    timestamp:string,
-    accessId:string,
-    deviceId:string,
-    messageId:string,
-    message:string
 }
 
 /**
