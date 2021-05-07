@@ -262,41 +262,30 @@ export type SISubscriptionsResult = {
     id: string
 }
 
-/**
- * Information of received messages will be transferred between class with this type
- */
-type SIInformation={
-    body?:string,
-    status?:string,
-    deviceCount?:string,
-    id?:string,
-    value?:string,
-    accessId?:string,
-    messageId?:string,
-    deviceId?:string,
-    message?:string,
-    accessLevel?:string,
-    count?:string,
-    timestamp?:string,
-    gatewayVersion?:string,
-    listProperty?:string[]
+type SIFrameContent = {
+    body?: string,
+    status?: string,
+    deviceCount?: string,
+    id?: string,
+    value?: string,
+    accessId?: string,
+    messageId?: string,
+    deviceId?: string,
+    message?: string,
+    accessLevel?: string,
+    count?: string,
+    timestamp?: string,
+    gatewayVersion?: string,
+    listProperty?: string[]
+}
+
+type SIDecodedFrame = {
+    command: string,
+    body: string,
+    headers: Map<string, string>
 }
 
 /**
- * A received frame will be treated as this type to separate his information
- *
- * -command : The first line of the frame which indicates the actual information
- * -body : Contain information which are better to treat with a JSON format
- * -headers : Contain basic information of the frame
- */
-type DecodedFrame={
-    command:string,
-    body:string,
-    headers:Map<string,string>
-}
-
-/**
- * @class SIAbstractGatewayClient
  * Abstract gateway to gives mandatory function to treat the frame with the defined websocket protocol
  */
 class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for the abstract class.
@@ -304,7 +293,7 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Function used to separate the information into a "DecodedFrame" instance
      * @param frame Frame to be decoded
      */
-    protected static decodeFrame(frame:string):DecodedFrame{
+    protected static decodeFrame(frame:string):SIDecodedFrame{
         let command:string="INVALID";
         let headers:Map<string,string>=new Map<string, string>();
 
@@ -368,9 +357,9 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode an authorize frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodeAuthorizedFrame(frame:string):SIInformation{
-        let decodedFrame:DecodedFrame = this.decodeFrame(frame);
-        let retVal:SIInformation= {
+    protected static decodeAuthorizedFrame(frame:string):SIFrameContent{
+        let decodedFrame:SIDecodedFrame = this.decodeFrame(frame);
+        let retVal:SIFrameContent= {
             accessLevel:undefined,
             gatewayVersion:undefined,
         };
@@ -407,12 +396,12 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode an enumerate frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodeEnumerateFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodeEnumerateFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             status:undefined,
             deviceCount:undefined,
         };
-        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="ENUMERATED"){
             retVal.status=decodedFrame.headers.get("status");
             retVal.deviceCount=decodedFrame.headers.get("device_count");
@@ -474,12 +463,12 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode a description frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodeDescriptionFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodeDescriptionFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             body:undefined,
             status:undefined,
         };
-        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="DESCRIPTION" && decodedFrame.headers.has("status")) {
             let status = decodedFrame.headers.get("status");
             retVal.status=status;
@@ -511,14 +500,14 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode a find property frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodePropertiesFoundFrame(frame:string):SIInformation{
-        let retVal:SIInformation={
+    protected static decodePropertiesFoundFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent={
             listProperty:undefined,
             status:undefined,
             id:undefined,
             count:undefined
         };
-        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="PROPERTIES FOUND" && decodedFrame.headers.has("status")
             && decodedFrame.headers.has("id")){
             let status = decodedFrame.headers.get("status");
@@ -551,13 +540,13 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode a property read frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodePropertyReadFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodePropertyReadFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             status:undefined,
             id:undefined,
             value:undefined
         };
-        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="PROPERTY READ" && decodedFrame.headers.has("status")
             && decodedFrame.headers.has("id")) {
             let status = decodedFrame.headers.get("status");
@@ -592,7 +581,7 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * */
     protected static decodePropertiesReadFrame(frame:string):SIPropertyReadResult[]{
         let retVal:SIPropertyReadResult[]= [];
-        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="PROPERTIES READ" && decodedFrame.headers.has("status")) {
             let jsonBody = JSON.parse(decodedFrame.body);
             let status = decodedFrame.headers.get("status");
@@ -648,12 +637,12 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode a property written frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodePropertyWrittenFrame(frame:string):SIInformation {
-        let retVal:SIInformation= {
+    protected static decodePropertyWrittenFrame(frame:string):SIFrameContent {
+        let retVal:SIFrameContent= {
             status:undefined,
             id:undefined,
         };
-        let decodedFrame: DecodedFrame = this.decodeFrame(frame);
+        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY WRITTEN" && decodedFrame.headers.has("status")
             && decodedFrame.headers.has("id")) {
             retVal.status=decodedFrame.headers.get("status");
@@ -678,12 +667,12 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode a property subscribe frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodePropertySubscribedFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodePropertySubscribedFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             status:undefined,
             id:undefined,
         };
-        let decodedFrame: DecodedFrame = this.decodeFrame(frame);
+        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY SUBSCRIBED" && decodedFrame.headers.has("status")
             && decodedFrame.headers.has("id")) {
             retVal.status=decodedFrame.headers.get("status");
@@ -712,7 +701,7 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      */
     protected static decodePropertiesSubscribedFrame(frame:string):SISubscriptionsResult[]{
         let retVal:SISubscriptionsResult[]= [];
-        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="PROPERTIES SUBSCRIBED" && decodedFrame.headers.has("status")) {
             let jsonBody = JSON.parse(decodedFrame.body);
             let status = decodedFrame.headers.get("status");
@@ -751,12 +740,12 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode an unsubscribe frame into a "SIInformation" instance
      * @param frame Frame to be decoded
      */
-    protected static decodePropertyUnsubscribedFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodePropertyUnsubscribedFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             status:undefined,
             id:undefined,
         };
-        let decodedFrame: DecodedFrame = this.decodeFrame(frame);
+        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY UNSUBSCRIBED" && decodedFrame.headers.has("status")
             && decodedFrame.headers.has("id")) {
             retVal.status=decodedFrame.headers.get("status");
@@ -785,7 +774,7 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      */
     protected static decodePropertiesUnsubscribedFrame(frame:string):SISubscriptionsResult[]{
         let retVal:SISubscriptionsResult[]= [];
-        let decodedFrame:DecodedFrame=this.decodeFrame(frame);
+        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
         if(decodedFrame.command==="PROPERTIES UNSUBSCRIBED" && decodedFrame.headers.has("status")) {
             let jsonBody = JSON.parse(decodedFrame.body);
             let status = decodedFrame.headers.get("status");
@@ -818,12 +807,12 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * property
      * @param frame Frame to be decoded
      */
-    protected static decodePropertyUpdateFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodePropertyUpdateFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             status:undefined,
             id:undefined,
         };
-        let decodedFrame: DecodedFrame = this.decodeFrame(frame);
+        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY UPDATE" && decodedFrame.headers.has("value")
             && decodedFrame.headers.has("id")) {
             retVal.status=decodedFrame.headers.get("status");
@@ -862,13 +851,13 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode a datalog read frame into a "SIInformation" instance
      * @param frame frame to be decoded
      */
-    protected static decodeDatalogReadFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodeDatalogReadFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             status:undefined,
             id:undefined,
             count:undefined,
         };
-        let decodedFrame: DecodedFrame = this.decodeFrame(frame);
+        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "DATALOG READ" && decodedFrame.headers.has("status" )
             && decodedFrame.headers.has("count"))
         {
@@ -907,15 +896,15 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * Decode the messages read into a "SIInformation" instance property
      * @param frame frame to be decoded
      */
-    protected static decodeMessagesReadFrame(frame:string):SIInformation[]{
-        let retVal:SIInformation[]=[];
-        let decodedFrame: DecodedFrame = this.decodeFrame(frame);
+    protected static decodeMessagesReadFrame(frame:string):SIFrameContent[]{
+        let retVal:SIFrameContent[]=[];
+        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "MESSAGES READ" && decodedFrame.headers.has("status" )
             && decodedFrame.headers.has("count"))
         {
             let jsonBody=JSON.parse(decodedFrame.body);
             for(let i =0; i<jsonBody.length;i++){
-                let message:SIInformation={
+                let message:SIFrameContent={
                     timestamp: jsonBody[i].timestamp,
                     accessId: jsonBody[i].access_id,
                     deviceId: jsonBody[i].device_id,
@@ -929,7 +918,7 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
                 retVal[0].count = decodedFrame.headers.get("count");
             }
             else{
-                let temp:SIInformation={
+                let temp:SIFrameContent={
                     status : decodedFrame.headers.get("status"),
                     count : decodedFrame.headers.get("count")
                 }
@@ -948,15 +937,15 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
      * property
      * @param frame frame to be decoded
      */
-    protected static decodeDeviceMessageFrame(frame:string):SIInformation{
-        let retVal:SIInformation= {
+    protected static decodeDeviceMessageFrame(frame:string):SIFrameContent{
+        let retVal:SIFrameContent= {
             id:undefined,
             accessId:undefined,
             messageId:undefined,
             message:undefined,
             timestamp:undefined,
         };
-        let decodedFrame: DecodedFrame = this.decodeFrame(frame);
+        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "DEVICE MESSAGE" && decodedFrame.headers.has("access_id")
             && decodedFrame.headers.has("device_id")&& decodedFrame.headers.has("message_id")&&
             decodedFrame.headers.has("message") && decodedFrame.headers.has("timestamp"))
@@ -999,11 +988,11 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
 }
 
 /**
- * @interface SIGatewayCallback
+ * @interface SIGatewayClientCallbacks
  * Base Interface containing all callback methods that can be called by the SIGatewayClient.
  * You can implement this class to your application.
  */
-export interface SIGatewayCallback{
+export interface SIGatewayClientCallbacks {
 
     /**
      * This method is called once the connection to the gateway could be established and
@@ -1146,7 +1135,6 @@ export interface SIGatewayCallback{
 }
 
 /**
- * @class SIGatewayClient
  * Complete, asynchronous (non-blocking) OpenStuder gateway client.
  * This client uses an asynchronous model which has the disadvantage to be a bit harder to use than the synchronous
  * version. The advantages are that long operations do not block the main thread as all results are reported
@@ -1226,7 +1214,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         };
         this.ws.onmessage = (event:MessageEvent)=>{
             let command: string = SIGatewayClient.peekFrameCommand(event.data);
-            let receivedMessage:SIInformation;
+            let receivedMessage:SIFrameContent;
             // In AUTHORIZE state, we only handle AUTHORIZED messages
             if(this.state===SIConnectionState.AUTHORIZING){
                 if (command === "AUTHORIZED") {
@@ -1352,7 +1340,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                         }
                         break;
                     case "MESSAGES READ":
-                        let receivedMessagesRead:SIInformation[] = SIGatewayClient.decodeMessagesReadFrame(event.data);
+                        let receivedMessagesRead:SIFrameContent[] = SIGatewayClient.decodeMessagesReadFrame(event.data);
                         let deviceMessages:SIDeviceMessage[]=[];
                         let count:number=0;
                         receivedMessagesRead.map(receivedMessageRead =>{
@@ -1624,3 +1612,8 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 }
+
+/**
+* @deprecated The method should not be used
+*/
+export type SIGatewayCallback = SIGatewayClientCallbacks;
