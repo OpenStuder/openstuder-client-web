@@ -1,3 +1,4 @@
+
 /**
  * Status of operations on the OpenStuder gateway.
  */
@@ -263,20 +264,17 @@ export type SISubscriptionsResult = {
 }
 
 type SIFrameContent = {
-    body?: string,
-    status?: string,
-    deviceCount?: string,
+    accessLevel?: string,
+    gatewayVersion?: string,
+    status?: SIStatus,
     id?: string,
     value?: string,
-    accessId?: string,
-    messageId?: string,
-    deviceId?: string,
-    message?: string,
-    accessLevel?: string,
-    count?: string,
-    timestamp?: string,
-    gatewayVersion?: string,
-    listProperty?: string[]
+    count?: number,
+
+    body?: string,
+
+    properties?: string[]
+    messages?: SIDeviceMessage[]
 }
 
 type SIDecodedFrame = {
@@ -285,52 +283,44 @@ type SIDecodedFrame = {
     headers: Map<string, string>
 }
 
-/**
- * Abstract gateway to gives mandatory function to treat the frame with the defined websocket protocol
- */
-class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for the abstract class.
-    /**
-     * Function used to separate the information into a "DecodedFrame" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodeFrame(frame:string):SIDecodedFrame{
-        let command:string="INVALID";
-        let headers:Map<string,string>=new Map<string, string>();
+class SIAbstractGatewayClient {
+    protected static decodeFrame(frame: string): SIDecodedFrame {
+        let command = "INVALID";
+        let headers = new Map<string, string>();
 
-        let lines:string[]=frame.split("\n");
-        if(lines.length>1){
-            command=lines[0];
-        }
-        else{
+        const lines = frame.split("\n");
+        if (lines.length > 1) {
+            command = lines[0];
+        } else {
             SIProtocolError.raise("Invalid frame");
         }
 
-        let line=1;
-        while (line<lines.length){
-            let components = lines[line].split(":");
-            //General case
-            if (components.length===2){
-                headers.set(components[0],components[1]);
+        let line = 1;
+        while (line < lines.length) {
+            const components = lines[line].split(":");
+            // General case
+            if (components.length === 2) {
+                headers.set(components[0], components[1]);
             }
-            //if our components has a timestamp, it will have several ':'
-            if(components.length>2){
-                let value="";
-                for(let i=1;i<components.length;i++){
-                    value+=":"+components[i];
+            // If our components has a timestamp, it will have several ':'
+            if (components.length > 2) {
+                let value = "";
+                for (let i = 1; i < components.length; i++) {
+                    value += ":" + components[i];
                 }
-                headers.set(components[0],value);
+                headers.set(components[0], value);
             }
-            line +=1;
-            //We don't want to treat the body here, we need to break before
-            if(lines[line]===""){
-                line +=1;
+            line += 1;
+            // We don't want to treat the body here, we need to break before
+            if (lines[line] === "") {
+                line += 1;
                 break;
             }
         }
         let body = lines[line];
-        line+=1;
-        while(line<lines.length){
-            if(lines[line]!=="") {
+        line += 1;
+        while (line < lines.length) {
+            if (lines[line] !== "") {
                 body += "\n" + lines[line];
             }
             line++;
@@ -339,650 +329,430 @@ class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for
         return {body: body, headers: headers, command: command};
     }
 
-    /**
-     * Encode a frame to be send to the gateway with the different credentials
-     * @param user Name of the user
-     * @param password Password for the user
-     */
-    protected static encodeAuthorizeFrame(user?:string, password?:string):string{
-        if(user!== "" || password !== "") {
+    protected static encodeAuthorizeFrame(user?: string, password?: string): string {
+        if (user !== "" || password !== "") {
             return "AUTHORIZE\nuser:" + user + "\npassword:" + password + "\nprotocol_version:1\n\n";
-        }
-        else{
+        } else {
             return 'AUTHORIZE\nprotocol_version:1\n\n';
         }
     }
 
-    /**
-     * Decode an authorize frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodeAuthorizedFrame(frame:string):SIFrameContent{
-        let decodedFrame:SIDecodedFrame = this.decodeFrame(frame);
-        let retVal:SIFrameContent= {
-            accessLevel:undefined,
-            gatewayVersion:undefined,
-        };
-
-        if(decodedFrame.command==="AUTHORIZED" && decodedFrame.headers.has("access_level") &&
-            decodedFrame.headers.has("protocol_version")){
-            if (decodedFrame.headers.get("protocol_version")==="1"){
-                retVal.accessLevel=decodedFrame.headers.get("access_level");
-                retVal.gatewayVersion=decodedFrame.headers.get("gateway_version")
-                return retVal;
-            }
-            else{
+    protected static decodeAuthorizedFrame(frame: string): SIFrameContent {
+        const decodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "AUTHORIZED" && decodedFrame.headers.has("access_level") && decodedFrame.headers.has("protocol_version")) {
+            if (decodedFrame.headers.get("protocol_version") === "1") {
+                return {
+                    accessLevel: decodedFrame.headers.get("access_level"),
+                    gatewayVersion: decodedFrame.headers.get("gateway_version")
+                };
+            } else {
                 SIProtocolError.raise("protocol version 1 not supported by server");
             }
-        }
-        else if(decodedFrame.command==="Error" && decodedFrame.headers.has("reason")){
-            let reason:string=""+decodedFrame.headers.get("reason");
-            SIProtocolError.raise(reason);
-        }
-        else{
+        } else if (decodedFrame.command === "Error" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
             SIProtocolError.raise("unknown error during authorization");
         }
-        return retVal;
+        return {}
     }
 
-    /**
-     * Encode a frame to be send to receive the number of device available
-     */
-    protected static encodeEnumerateFrame(){
+    protected static encodeEnumerateFrame() {
         return "ENUMERATE\n\n";
     }
 
-    /**
-     * Decode an enumerate frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodeEnumerateFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            status:undefined,
-            deviceCount:undefined,
-        };
-        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
-        if(decodedFrame.command==="ENUMERATED"){
-            retVal.status=decodedFrame.headers.get("status");
-            retVal.deviceCount=decodedFrame.headers.get("device_count");
-        }
-        else if(decodedFrame.command==="ERROR"){
-            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
-        }
-        else{
+    protected static decodeEnumerateFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "ENUMERATED") {
+            return {
+                status: statusFromString(decodedFrame.headers.get("status")),
+                count: +(decodedFrame.headers.get("device_count") || 0)
+            };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
             SIProtocolError.raise("unknown error during property read");
         }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Encode a describe frame to be send to receive the description of the device(s)
-     * @param deviceAccessId Select the accessor
-     * @param deviceId Select the device, undefined will give all devices
-     * @param propertyId Select the property of the selected device, undefined will give all properties
-     * @param flags If present, gives additional information
-     */
-    protected static encodeDescribeFrame(deviceAccessId?:string, deviceId?:string,
-                               propertyId?:number, flags?:SIDescriptionFlags[]):string{
-        let frame="DESCRIBE\n";
-        if(deviceAccessId){
-            frame+="id:"+deviceAccessId;
-            if(deviceId){
-                frame+="."+deviceId;
-                if(propertyId){
-                    frame += "."+propertyId;
+    protected static encodeDescribeFrame(deviceAccessId?: string, deviceId?: string, propertyId?: number, flags?: SIDescriptionFlags[]): string {
+        let frame = "DESCRIBE\n";
+        if (deviceAccessId) {
+            frame += "id:" + deviceAccessId;
+            if (deviceId) {
+                frame += "." + deviceId;
+                if (propertyId) {
+                    frame += "." + propertyId;
                 }
             }
-            frame+="\n";
+            frame += "\n";
         }
-        if(flags?.length!==0 && flags!==undefined){
-            frame+="flags:";
-            flags?.map(flag =>{
+        if (flags?.length !== 0 && flags !== undefined) {
+            frame += "flags:";
+            flags.map(flag => {
                 if (flag === SIDescriptionFlags.INCLUDE_ACCESS_INFORMATION) {
-                    frame+="IncludeAccessInformation,";
+                    frame += "IncludeAccessInformation,";
                 }
                 if (flag === SIDescriptionFlags.INCLUDE_PROPERTY_INFORMATION) {
-                    frame+="IncludePropertyInformation,";
+                    frame += "IncludePropertyInformation,";
                 }
                 if (flag === SIDescriptionFlags.INCLUDE_DEVICE_INFORMATION) {
-                    frame+="IncludeDeviceInformation,";
+                    frame += "IncludeDeviceInformation,";
                 }
                 if (flag === SIDescriptionFlags.INCLUDE_DRIVER_INFORMATION) {
-                    frame+="IncludeDriverInformation,";
+                    frame += "IncludeDriverInformation,";
                 }
             });
             //Suppress the last ',' or \n if no flag
             frame = frame.substring(0, frame.length - 1);
-            frame+="\n";
+            frame += "\n";
         }
-        frame+="\n";
+        frame += "\n";
         return frame;
     }
 
-    /**
-     * Decode a description frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodeDescriptionFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            body:undefined,
-            status:undefined,
-        };
-        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
-        if(decodedFrame.command==="DESCRIPTION" && decodedFrame.headers.has("status")) {
-            let status = decodedFrame.headers.get("status");
-            retVal.status=status;
-            if (status === "Success") {
-                retVal.body=decodedFrame.body;
-            }
-        }
-        else if(decodedFrame.command==="ERROR"){
-            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
-        }
-        else{
+    protected static decodeDescriptionFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "DESCRIPTION" && decodedFrame.headers.has("status")) {
+            const status = statusFromString(decodedFrame.headers.get("status"));
+            return {
+                status: status,
+                id: decodedFrame.headers.get("id"),
+                body: status === SIStatus.SUCCESS ? decodedFrame.body : undefined
+            };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
             SIProtocolError.raise("unknown error during description");
         }
-        if(decodedFrame.headers.has("id")){
-            retVal.id=decodedFrame.headers.get("id");
-        }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Encode a find property frame to send, support wildcard char
-     * @param propertyId Property to be read
-     */
-    protected static encodeFindPropertiesFrame(propertyId:string){
-        return "FIND PROPERTIES\nid:"+propertyId+"\n\n";
+    protected static encodeFindPropertiesFrame(propertyId: string) {
+        return "FIND PROPERTIES\nid:" + propertyId + "\n\n";
     }
 
-    /**
-     * Decode a find property frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertiesFoundFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent={
-            listProperty:undefined,
-            status:undefined,
-            id:undefined,
-            count:undefined
-        };
-        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
-        if(decodedFrame.command==="PROPERTIES FOUND" && decodedFrame.headers.has("status")
-            && decodedFrame.headers.has("id")){
-            let status = decodedFrame.headers.get("status");
-            retVal.status=status;
-            retVal.count=decodedFrame.headers.get("count");
-            if(status==="Success"){
-                retVal.id=decodedFrame.headers.get("id");
-                retVal.listProperty = JSON.parse(decodedFrame.body);
+    protected static decodePropertiesFoundFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTIES FOUND" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id") && decodedFrame.headers.has("count")) {
+            const status = statusFromString(decodedFrame.headers.get("status"));
+            return {
+                status: status,
+                id: decodedFrame.headers.get("id"),
+                count: +(decodedFrame.headers.get("count") || 0),
+                properties: status === SIStatus.SUCCESS ? JSON.parse(decodedFrame.body) : undefined
             }
-        }
-        else if(decodedFrame.command==="ERROR"){
-            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
-        }
-        else{
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
             SIProtocolError.raise("unknown error during find properties");
         }
-        return retVal;
+        return {};
     }
 
-
-    /**
-     * Encode a read property frame to receive the current value of a property
-     * @param propertyId Property to be read
-     */
-    protected static encodeReadPropertyFrame(propertyId:string):string{
-        return "READ PROPERTY\nid:"+propertyId+"\n\n";
+    protected static encodeReadPropertyFrame(propertyId: string): string {
+        return "READ PROPERTY\nid:" + propertyId + "\n\n";
     }
 
-    /**
-     * Decode a property read frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertyReadFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            status:undefined,
-            id:undefined,
-            value:undefined
-        };
-        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
-        if(decodedFrame.command==="PROPERTY READ" && decodedFrame.headers.has("status")
-            && decodedFrame.headers.has("id")) {
-            let status = decodedFrame.headers.get("status");
-            retVal.status=status;
-            retVal.id=decodedFrame.headers.get("id");
-            if(status==="Success" && decodedFrame.headers.has("value")){
-                retVal.value=decodedFrame.headers.get("value");
+    protected static decodePropertyReadFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTY READ" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
+            const status = statusFromString(decodedFrame.headers.get("status"));
+            return {
+                status: status,
+                id: decodedFrame.headers.get("id"),
+                value: status == SIStatus.SUCCESS ? decodedFrame.headers.get("value") : undefined
             }
-        }
-        else if(decodedFrame.command==="ERROR"){
-            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
-        }
-        else{
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
             SIProtocolError.raise("unknown error during property read");
         }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Encode a read properties frame to receive the current value of the multiple properties
-     * @param propertyIds Properties to be read
-     */
-    protected static encodeReadPropertiesFrame(propertyIds:string[]):string{
+    protected static encodeReadPropertiesFrame(propertyIds: string[]): string {
         let frame = "READ PROPERTIES\n\n";
         frame += JSON.stringify(propertyIds);
         return frame;
     }
 
-    /**
-     * Decode a properties read frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     * */
-    protected static decodePropertiesReadFrame(frame:string):SIPropertyReadResult[]{
-        let retVal:SIPropertyReadResult[]= [];
-        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
-        if(decodedFrame.command==="PROPERTIES READ" && decodedFrame.headers.has("status")) {
-            let jsonBody = JSON.parse(decodedFrame.body);
-            let status = decodedFrame.headers.get("status");
-            if(status==="Success"){
-                for(let i=0; i<jsonBody.length;i++){
-                    let temp:SIPropertyReadResult={
-                        status:SIStatus.ERROR,
-                        id:"",
-                        value:""
-                    };
-                    temp.status=statusFromString(jsonBody[i].status);
-                    temp.id=jsonBody[i].id;
-                    temp.value=jsonBody[i].value;
-                    retVal.push(temp);
+    protected static decodePropertiesReadFrame(frame: string): SIPropertyReadResult[] {
+        let results: SIPropertyReadResult[] = [];
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTIES READ" && decodedFrame.headers.has("status")) {
+            const status = statusFromString(decodedFrame.headers.get("status"));
+            if (status === SIStatus.SUCCESS) {
+                const jsonBody = JSON.parse(decodedFrame.body);
+                for (let i = 0; i < jsonBody.length; i++) {
+                    results.push({
+                        status: statusFromString(jsonBody[i].status),
+                        id: jsonBody[i].id,
+                        value: jsonBody[i].value
+                    });
                 }
+            } else {
+                SIProtocolError.raise("error during property read, status=" + decodedFrame.headers.get("status"));
             }
-            else{
-                SIProtocolError.raise("Error on status on read properties frame: " + status);
-            }
-        }
-        else if(decodedFrame.command==="ERROR"){
-            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
-        }
-        else{
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
             SIProtocolError.raise("unknown error during property read");
         }
-        return retVal;
+        return results;
     }
 
-    /**
-     * Encode a write property frame to write a new parameter for the system
-     * @param propertyId Property to be written
-     * @param value New value
-     * @param flags dDetermine if the new value should be stocked in the database
-     */
-    protected static encodeWritePropertyFrame(propertyId:string, value?:string, flags?:SIWriteFlags):string{
+    protected static encodeWritePropertyFrame(propertyId: string, value?: string, flags?: SIWriteFlags): string {
         let frame = "WRITE PROPERTY\nid:" + propertyId + "\n";
-        if(flags){
-            frame+="flags:";
-            if(flags === SIWriteFlags.PERMANENT){
-                frame+="Permanent";
+        if (flags) {
+            frame += "flags:";
+            if (flags === SIWriteFlags.PERMANENT) {
+                frame += "Permanent";
             }
-            frame+="\n";
+            frame += "\n";
         }
-        if(value){
-            frame+="value:"+value+"\n";
+        if (value) {
+            frame += "value:" + value + "\n"; // TODO: Value should not be string.
         }
-        frame+="\n";
+        frame += "\n";
         return frame;
     }
 
-    /**
-     * Decode a property written frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertyWrittenFrame(frame:string):SIFrameContent {
-        let retVal:SIFrameContent= {
-            status:undefined,
-            id:undefined,
-        };
-        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
-        if (decodedFrame.command === "PROPERTY WRITTEN" && decodedFrame.headers.has("status")
-            && decodedFrame.headers.has("id")) {
-            retVal.status=decodedFrame.headers.get("status");
-            retVal.id=decodedFrame.headers.get("id");
-        } else if (decodedFrame.command === "ERROR") {
-            SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
+    protected static decodePropertyWrittenFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTY WRITTEN" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
+            return {
+                status: statusFromString(decodedFrame.headers.get("status")),
+                id: decodedFrame.headers.get("id")
+            };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during property write");
         }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Encode a frame to be send to subscribe to a property
-     * @param propertyId Property to subscribe
-     */
-    protected static encodeSubscribePropertyFrame(propertyId:string):string{
-        return "SUBSCRIBE PROPERTY\nid:"+propertyId+"\n\n";
+    protected static encodeSubscribePropertyFrame(propertyId: string): string {
+        return "SUBSCRIBE PROPERTY\nid:" + propertyId + "\n\n";
     }
 
-    /**
-     * Decode a property subscribe frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertySubscribedFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            status:undefined,
-            id:undefined,
-        };
-        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
-        if (decodedFrame.command === "PROPERTY SUBSCRIBED" && decodedFrame.headers.has("status")
-            && decodedFrame.headers.has("id")) {
-            retVal.status=decodedFrame.headers.get("status");
-            retVal.id=decodedFrame.headers.get("id");
-        } else if (decodedFrame.command === "ERROR") {
-            SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
+    protected static decodePropertySubscribedFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTY SUBSCRIBED" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
+            return {
+                status: statusFromString(decodedFrame.headers.get("status")),
+                id: decodedFrame.headers.get("id")
+            };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during property subscribe");
         }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Encode a frame to be send to subscribe to multiple properties
-     * @param propertyIds Properties to subscribe
-     */
-    protected static encodeSubscribePropertiesFrame(propertyIds:string[]):string{
+    protected static encodeSubscribePropertiesFrame(propertyIds: string[]): string {
         let frame = "SUBSCRIBE PROPERTIES\n\n";
         frame += JSON.stringify(propertyIds);
         return frame;
     }
 
-    /**
-     * Decode a properties subscribe frame into an array of SISubscriptionResult
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertiesSubscribedFrame(frame:string):SISubscriptionsResult[]{
-        let retVal:SISubscriptionsResult[]= [];
-        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
-        if(decodedFrame.command==="PROPERTIES SUBSCRIBED" && decodedFrame.headers.has("status")) {
-            let jsonBody = JSON.parse(decodedFrame.body);
-            let status = decodedFrame.headers.get("status");
-            if(status==="Success"){
-                for(let i=0; i<jsonBody.length;i++){
-                    let temp:SIPropertyReadResult={
-                        status:SIStatus.ERROR,
-                        id:"",
-                    };
-                    temp.status=statusFromString(jsonBody[i].status);
-                    temp.id=jsonBody[i].id;
-                    retVal.push(temp);
+    protected static decodePropertiesSubscribedFrame(frame: string): SISubscriptionsResult[] {
+        let results: SISubscriptionsResult[] = [];
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTIES SUBSCRIBED" && decodedFrame.headers.has("status")) {
+            const status = statusFromString(decodedFrame.headers.get("status"));
+            if (status === SIStatus.SUCCESS) {
+                const jsonBody = JSON.parse(decodedFrame.body);
+                for (let i = 0; i < jsonBody.length; i++) {
+                    results.push({
+                        status: statusFromString(jsonBody[i].status),
+                        id: jsonBody[i].id
+                    });
                 }
+            } else {
+                SIProtocolError.raise("error during properties subscribe, status=" + decodedFrame.headers.get("status"));
             }
-            else{
-                SIProtocolError.raise("Error on status on properties subscribed: " + status);
-            }
-        }
-        else if(decodedFrame.command==="ERROR"){
-            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
-        }
-        else{
-            SIProtocolError.raise("unknown error during property read");
-        }
-        return retVal;
-    }
-    /**
-     * Encode an unsubscribe frame to cancel the subscription to a property
-     * @param propertyId Property to unsubscribe
-     */
-    protected static encodeUnsubscribePropertyFrame(propertyId:string):string{
-        return "UNSUBSCRIBE PROPERTY\nid:"+propertyId+"\n\n";
-    }
-
-    /**
-     * Decode an unsubscribe frame into a "SIInformation" instance
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertyUnsubscribedFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            status:undefined,
-            id:undefined,
-        };
-        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
-        if (decodedFrame.command === "PROPERTY UNSUBSCRIBED" && decodedFrame.headers.has("status")
-            && decodedFrame.headers.has("id")) {
-            retVal.status=decodedFrame.headers.get("status");
-            retVal.id=decodedFrame.headers.get("id");
-        } else if (decodedFrame.command === "ERROR") {
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
         } else {
-            SIProtocolError.raise("unknown error during property subscribe");
+            SIProtocolError.raise("unknown error during properties subscribe");
         }
-        return retVal;
+        return results;
     }
 
-    /**
-     * Encode a frame to be send to unsubscribe to multiple properties
-     * @param propertyIds Properties to unsubscribe
-     */
-    protected static encodeUnsubscribePropertiesFrame(propertyIds:string[]):string{
+    protected static encodeUnsubscribePropertyFrame(propertyId: string): string {
+        return "UNSUBSCRIBE PROPERTY\nid:" + propertyId + "\n\n";
+    }
+
+    protected static decodePropertyUnsubscribedFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTY UNSUBSCRIBED" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
+            return {
+                status: statusFromString(decodedFrame.headers.get("status")),
+                id: decodedFrame.headers.get("id")
+            }
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
+            SIProtocolError.raise("unknown error during property unsubscribe");
+        }
+        return {};
+    }
+
+    protected static encodeUnsubscribePropertiesFrame(propertyIds: string[]): string {
         let frame = "UNSUBSCRIBE PROPERTIES\n\n";
         frame += JSON.stringify(propertyIds);
         return frame;
     }
 
-    /**
-     * Decode a properties unsubscribe frame into an array of SISubscriptionResult
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertiesUnsubscribedFrame(frame:string):SISubscriptionsResult[]{
-        let retVal:SISubscriptionsResult[]= [];
-        let decodedFrame:SIDecodedFrame=this.decodeFrame(frame);
-        if(decodedFrame.command==="PROPERTIES UNSUBSCRIBED" && decodedFrame.headers.has("status")) {
-            let jsonBody = JSON.parse(decodedFrame.body);
-            let status = decodedFrame.headers.get("status");
-            if(status==="Success"){
-                for(let i=0; i<jsonBody.length;i++){
-                    let temp:SIPropertyReadResult={
-                        status:SIStatus.ERROR,
-                        id:"",
-                    };
-                    temp.status=statusFromString(jsonBody[i].status);
-                    temp.id=jsonBody[i].id;
-                    retVal.push(temp);
+    protected static decodePropertiesUnsubscribedFrame(frame: string): SISubscriptionsResult[] {
+        let result: SISubscriptionsResult[] = [];
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTIES UNSUBSCRIBED" && decodedFrame.headers.has("status")) {
+            const status = statusFromString(decodedFrame.headers.get("status"));
+            if (status === SIStatus.SUCCESS) {
+                const jsonBody = JSON.parse(decodedFrame.body);
+                for (let i = 0; i < jsonBody.length; i++) {
+                    result.push({
+                        status: statusFromString(jsonBody[i].status),
+                        id: jsonBody[i].id
+                    });
                 }
+            } else {
+                SIProtocolError.raise("error during properties unsubscribe, status=" + decodedFrame.headers.get("status"));
             }
-            else{
-                SIProtocolError.raise("Error on status on properties unsubscribed frame: " + status);
-            }
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
+            SIProtocolError.raise("unknown error during properties unsubscribe");
         }
-        else if(decodedFrame.command==="ERROR"){
-            SIProtocolError.raise(""+decodedFrame.headers.get("reason"));
-        }
-        else{
-            SIProtocolError.raise("unknown error during property read");
-        }
-        return retVal;
+        return result;
     }
 
-    /**
-     * Decode a property update frame into a "SIInformation" instance, received because we are subscribed to this
-     * property
-     * @param frame Frame to be decoded
-     */
-    protected static decodePropertyUpdateFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            status:undefined,
-            id:undefined,
-        };
-        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
-        if (decodedFrame.command === "PROPERTY UPDATE" && decodedFrame.headers.has("value")
-            && decodedFrame.headers.has("id")) {
-            retVal.status=decodedFrame.headers.get("status");
-            retVal.id=decodedFrame.headers.get("id");
-			retVal.value=decodedFrame.headers.get("value");
-        } else if (decodedFrame.command === "ERROR") {
-            SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
+    protected static decodePropertyUpdateFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "PROPERTY UPDATE" && decodedFrame.headers.has("value") && decodedFrame.headers.has("id")) {
+            return {
+                status: statusFromString(decodedFrame.headers.get("status")),
+                id: decodedFrame.headers.get("id"),
+                value: decodedFrame.headers.get("value")
+            };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error receiving property update");
         }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Encode a read datalog frame to be send to get the datalog
-     * @param propertyId Wanted property in the format <device access ID>.<device ID>.<property ID>
-     * @param dateFrom Start date and time to get logged data from (ISO 8601 extended format)
-     * @param dateTo End date and time to get the logged data to (ISO 8601 extended format)
-     * @param limit Number of maximum received messages
-     */
-    protected static encodeReadDatalogFrame(propertyId?:string, dateFrom?:Date, dateTo?:Date, limit?:number){
-        let frame:string = 'READ DATALOG\n';
-        if(propertyId){
-            frame += "id:" + propertyId +"\n";
+    protected static encodeReadDatalogFrame(propertyId?: string, dateFrom?: Date, dateTo?: Date, limit?: number) {
+        let frame: string = 'READ DATALOG\n';
+        if (propertyId) {
+            frame += "id:" + propertyId + "\n";
         }
-        frame += SIAbstractGatewayClient.getTimestampHeader('from',dateFrom);
-        frame += SIAbstractGatewayClient.getTimestampHeader('to',dateTo);
-        if(limit){
-            frame += 'limit:'+limit+'\n';
+        frame += SIAbstractGatewayClient.getTimestampHeaderIfPresent('from', dateFrom);
+        frame += SIAbstractGatewayClient.getTimestampHeaderIfPresent('to', dateTo);
+        if (limit) {
+            frame += 'limit:' + limit + '\n';
         }
         frame += '\n';
         return frame;
     }
 
-    /**
-     * Decode a datalog read frame into a "SIInformation" instance
-     * @param frame frame to be decoded
-     */
-    protected static decodeDatalogReadFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            status:undefined,
-            id:undefined,
-            count:undefined,
-        };
-        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
-        if (decodedFrame.command === "DATALOG READ" && decodedFrame.headers.has("status" )
-            && decodedFrame.headers.has("count"))
-        {
-            if(decodedFrame.headers.has("id")) {
-                retVal.id = decodedFrame.headers.get("id");
-            }
-            retVal.status=decodedFrame.headers.get("status");
-            retVal.count=decodedFrame.headers.get("count");
-            retVal.body=decodedFrame.body;
-        } else if (decodedFrame.command === "ERROR") {
-            SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
+    protected static decodeDatalogReadFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "DATALOG READ" && decodedFrame.headers.has("status") && decodedFrame.headers.has("count")) {
+            return {
+                status: statusFromString(decodedFrame.headers.get("status")),
+                id: decodedFrame.headers.get("id"),
+                count: +(decodedFrame.headers.get("count") || 0),
+                body: decodedFrame.body
+            };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error receiving datalog read");
         }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Encode a frame to be send to retrieve all or a subset of stored messages send by devices
-     * @param dateFrom start date and time to get logged data from (ISO 8601 extended format)
-     * @param dateTo end date and time to get the logged data to (ISO 8601 extended format)
-     * @param limit number of maximum received messages
-     */
-    protected static encodeReadMessagesFrame(dateFrom?:Date, dateTo?:Date, limit?:number){
-        let frame:string = 'READ MESSAGES\n';
-        frame += SIAbstractGatewayClient.getTimestampHeader('from',dateFrom);
-        frame += SIAbstractGatewayClient.getTimestampHeader('to',dateTo);
-        if(limit){
-            frame += 'limit:'+limit+'\n';
+    protected static encodeReadMessagesFrame(dateFrom?: Date, dateTo?: Date, limit?: number) {
+        let frame: string = 'READ MESSAGES\n';
+        frame += SIAbstractGatewayClient.getTimestampHeaderIfPresent('from', dateFrom);
+        frame += SIAbstractGatewayClient.getTimestampHeaderIfPresent('to', dateTo);
+        if (limit) {
+            frame += 'limit:' + limit + '\n';
         }
         frame += '\n';
         return frame;
     }
 
-    /**
-     * Decode the messages read into a "SIInformation" instance property
-     * @param frame frame to be decoded
-     */
-    protected static decodeMessagesReadFrame(frame:string):SIFrameContent[]{
-        let retVal:SIFrameContent[]=[];
-        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
-        if (decodedFrame.command === "MESSAGES READ" && decodedFrame.headers.has("status" )
-            && decodedFrame.headers.has("count"))
-        {
-            let jsonBody=JSON.parse(decodedFrame.body);
-            for(let i =0; i<jsonBody.length;i++){
-                let message:SIFrameContent={
-                    timestamp: jsonBody[i].timestamp,
-                    accessId: jsonBody[i].access_id,
-                    deviceId: jsonBody[i].device_id,
-                    messageId: jsonBody[i].message_id,
-                    message: jsonBody[i].message
+    protected static decodeMessagesReadFrame(frame: string): SIFrameContent {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "MESSAGES READ" && decodedFrame.headers.has("status") && decodedFrame.headers.has("count")) {
+            const status = statusFromString(decodedFrame.headers.get("status"));
+            if (status === SIStatus.SUCCESS) {
+                let messages: SIDeviceMessage[] = [];
+                const jsonBody = JSON.parse(decodedFrame.body);
+                for (let i = 0; i < jsonBody.length; i++) {
+                    messages.push({
+                        timestamp: jsonBody[i].timestamp,
+                        accessId: jsonBody[i].access_id,
+                        deviceId: jsonBody[i].device_id,
+                        messageId: jsonBody[i].message_id,
+                        message: jsonBody[i].message
+                    });
                 }
-                retVal.push(message);
+                return {
+                    status: status,
+                    count: +(decodedFrame.headers.get("count") || 0),
+                    messages: messages
+                };
+            } else {
+                return {
+                    status: status,
+                    count: +(decodedFrame.headers.get("count") || 0),
+                    messages: []
+                };
             }
-            if(retVal[0]) {
-                retVal[0].status = decodedFrame.headers.get("status");
-                retVal[0].count = decodedFrame.headers.get("count");
-            }
-            else{
-                let temp:SIFrameContent={
-                    status : decodedFrame.headers.get("status"),
-                    count : decodedFrame.headers.get("count")
-                }
-                retVal.push(temp);
-            }
-        } else if (decodedFrame.command === "ERROR") {
-            SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error receiving messages");
         }
-        return retVal;
+        return {};
     }
 
-    /**
-     * Decode the message of the devices into a "SIInformation" instance
-     * property
-     * @param frame frame to be decoded
-     */
-    protected static decodeDeviceMessageFrame(frame:string):SIFrameContent{
-        let retVal:SIFrameContent= {
-            id:undefined,
-            accessId:undefined,
-            messageId:undefined,
-            message:undefined,
-            timestamp:undefined,
-        };
-        let decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
-        if (decodedFrame.command === "DEVICE MESSAGE" && decodedFrame.headers.has("access_id")
-            && decodedFrame.headers.has("device_id")&& decodedFrame.headers.has("message_id")&&
-            decodedFrame.headers.has("message") && decodedFrame.headers.has("timestamp"))
-        {
-            retVal.accessId=decodedFrame.headers.get("access_id");
-            retVal.messageId=decodedFrame.headers.get("message_id");
-            retVal.message=decodedFrame.headers.get("message");
-            retVal.deviceId=decodedFrame.headers.get("device_id");
-            retVal.timestamp=decodedFrame.headers.get("timestamp");
-        } else if (decodedFrame.command === "ERROR") {
-            SIProtocolError.raise("" + decodedFrame.headers.get("reason"));
+    protected static decodeDeviceMessageFrame(frame: string): SIDeviceMessage {
+        const decodedFrame: SIDecodedFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "DEVICE MESSAGE" && decodedFrame.headers.has("access_id") && decodedFrame.headers.has("device_id") &&
+            decodedFrame.headers.has("message_id") && decodedFrame.headers.has("message") && decodedFrame.headers.has("timestamp")) {
+            return {
+                timestamp: decodedFrame.headers.get("timestamp")!,
+                accessId: decodedFrame.headers.get("access_id")!,
+                deviceId: decodedFrame.headers.get("device_id")!,
+                messageId: decodedFrame.headers.get("message_id")!,
+                message: decodedFrame.headers.get("message")!
+            };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error receiving device message");
         }
-        return retVal;
+        return {accessId: "", deviceId: "", message: "", messageId: "", timestamp: ""};
     }
 
-    /**
-     * Convert a date time to a string for the encode of frames
-     * @param key dateFrom (start) or dateTo (stop)
-     * @param timestamp Wanted date
-     */
-    protected static getTimestampHeader(key:string, timestamp?:Date):string{
-        if(timestamp){
+    protected static getTimestampHeaderIfPresent(key: string, timestamp?: Date): string {
+        if (timestamp) {
             return key + ':' + timestamp.toISOString() + '\n';
-        }
-        else{
+        } else {
             return '';
         }
     }
 
-    /**
-     * Get the first line (the command of the frame)
-     * @param frame Frame to be peeked
-     */
-    protected static peekFrameCommand(frame:string):string{
-        //Return the first line of the received frame
+    protected static peekFrameCommand(frame: string): string {
         return (frame.split("\n"))[0];
     }
 }
@@ -1151,7 +921,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
     private user?:string;
     private password?:string;
 
-    private siGatewayCallback:SIGatewayCallback | undefined;
+    private siGatewayCallback:SIGatewayClientCallbacks | undefined;
 
     public constructor(){
         super();
@@ -1174,7 +944,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
-    public setCallback(siGatewayCallback:SIGatewayCallback){
+    public setCallback(siGatewayCallback:SIGatewayClientCallbacks){
         this.siGatewayCallback=siGatewayCallback;
     }
 
@@ -1248,131 +1018,121 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                         break;
                     case "ENUMERATED":
                         receivedMessage = SIGatewayClient.decodeEnumerateFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.deviceCount) {
-                            this.siGatewayCallback.onEnumerated(statusFromString(receivedMessage.status),+receivedMessage.deviceCount);
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.count !== undefined) {
+                            this.siGatewayCallback.onEnumerated(receivedMessage.status, receivedMessage.count);
                         }
                         break;
+
                     case "DESCRIPTION":
                         receivedMessage = SIGatewayClient.decodeDescriptionFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.body) {
-                            this.siGatewayCallback.onDescription(statusFromString(receivedMessage.status),receivedMessage.body,receivedMessage.id);
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.body !== undefined ) {
+                            this.siGatewayCallback.onDescription(receivedMessage.status,receivedMessage.body,receivedMessage.id);
                         }
                         break;
+
                     case "PROPERTIES FOUND":
                         receivedMessage = SIGatewayClient.decodePropertiesFoundFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id && receivedMessage.count && receivedMessage.listProperty){
-                            this.siGatewayCallback.onPropertiesFound(statusFromString(receivedMessage.status), receivedMessage.id, +receivedMessage.count, receivedMessage.listProperty);
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined  && receivedMessage.count !== undefined &&
+                            receivedMessage.properties !== undefined ){
+                            this.siGatewayCallback.onPropertiesFound(receivedMessage.status, receivedMessage.id, receivedMessage.count, receivedMessage.properties);
                         }
                         break;
+
                     case "PROPERTY READ":
                         receivedMessage = SIGatewayClient.decodePropertyReadFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
-                            this.siGatewayCallback.onPropertyRead(statusFromString(receivedMessage.status),receivedMessage.id,receivedMessage.value);
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined ) {
+                            this.siGatewayCallback.onPropertyRead(receivedMessage.status,receivedMessage.id,receivedMessage.value);
                         }
                         break;
+
                     case "PROPERTIES READ":
                         let receivedPropertyResult = SIGatewayClient.decodePropertiesReadFrame(event.data);
                         if(this.siGatewayCallback){
                             this.siGatewayCallback.onPropertiesRead(receivedPropertyResult);
                         }
                         break;
+
                     case "PROPERTY WRITTEN":
                         receivedMessage = SIGatewayClient.decodePropertyWrittenFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined ) {
                             //status:SIStatus, propertyId:string
-                            this.siGatewayCallback.onPropertyWritten(statusFromString(receivedMessage.status),receivedMessage.id);
+                            this.siGatewayCallback.onPropertyWritten(receivedMessage.status,receivedMessage.id);
                         }
                         break;
+
                     case "PROPERTY SUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertySubscribedFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
-                            this.siGatewayCallback.onPropertySubscribed(statusFromString(receivedMessage.status),receivedMessage.id);
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined ) {
+                            this.siGatewayCallback.onPropertySubscribed(receivedMessage.status,receivedMessage.id);
                         }
                         break;
+
                     case "PROPERTIES SUBSCRIBED":
                         let receivedSubscriptionResult:SISubscriptionsResult[]=SIGatewayClient.decodePropertiesSubscribedFrame(event.data);
                         if(this.siGatewayCallback){
                             this.siGatewayCallback.onPropertiesSubscribed(receivedSubscriptionResult);
                         }
                         break;
+
                     case "PROPERTY UNSUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertyUnsubscribedFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
-                            this.siGatewayCallback.onPropertyUnsubscribed(statusFromString(receivedMessage.status),receivedMessage.id);
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined ) {
+                            this.siGatewayCallback.onPropertyUnsubscribed(receivedMessage.status,receivedMessage.id);
                         }
                         break;
+
                     case "PROPERTIES UNSUBSCRIBED":
                         let receivedUnsubscriptionResult:SISubscriptionsResult[]=SIGatewayClient.decodePropertiesUnsubscribedFrame(event.data);
                         if(this.siGatewayCallback){
                             this.siGatewayCallback.onPropertiesUnsubscribed(receivedUnsubscriptionResult);
                         }
                         break;
+
                     case "PROPERTY UPDATE":
                         receivedMessage = SIGatewayClient.decodePropertyUpdateFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.id) {
+                        if(this.siGatewayCallback && receivedMessage.id !== undefined ) {
                             this.siGatewayCallback.onPropertyUpdated(receivedMessage.id, receivedMessage.value);
                         }
                         break;
+
                     case "DATALOG READ":
                         receivedMessage = SIGatewayClient.decodeDatalogReadFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.status && receivedMessage.body && receivedMessage.count) {
+                        if(this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.body !== undefined  && receivedMessage.count !== undefined) {
                             if(receivedMessage.id){
-                                this.siGatewayCallback.onDatalogRead(statusFromString(receivedMessage.status),receivedMessage.id, +receivedMessage.count, receivedMessage.body);
+                                this.siGatewayCallback.onDatalogRead(receivedMessage.status,receivedMessage.id, receivedMessage.count, receivedMessage.body);
                             }
                             else {
                                 let properties = receivedMessage.body.split("\n");
-                                this.siGatewayCallback.onDatalogPropertiesRead(statusFromString(receivedMessage.status), properties);
+                                this.siGatewayCallback.onDatalogPropertiesRead(receivedMessage.status, properties);
                             }
                         }
                         break;
+
                     case "DEVICE MESSAGE":
-                        receivedMessage = SIGatewayClient.decodeDeviceMessageFrame(event.data);
-                        if(this.siGatewayCallback && receivedMessage.timestamp && receivedMessage.accessId && receivedMessage.deviceId
-                            && receivedMessage.messageId && receivedMessage.message) {
-                            let deviceMessage:SIDeviceMessage={
-                                timestamp:receivedMessage.timestamp,
-                                accessId:receivedMessage.accessId,
-                                deviceId:receivedMessage.deviceId,
-                                messageId:receivedMessage.messageId,
-                                message:receivedMessage.message
-                            }
-                            this.siGatewayCallback.onDeviceMessage(deviceMessage);
+                        const message = SIGatewayClient.decodeDeviceMessageFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onDeviceMessage(message);
                         }
                         break;
+
                     case "MESSAGES READ":
-                        let receivedMessagesRead:SIFrameContent[] = SIGatewayClient.decodeMessagesReadFrame(event.data);
-                        let deviceMessages:SIDeviceMessage[]=[];
-                        let count:number=0;
-                        receivedMessagesRead.map(receivedMessageRead =>{
-                            if(receivedMessageRead.timestamp && receivedMessageRead.accessId &&
-                                receivedMessageRead.deviceId && receivedMessageRead.messageId &&
-                                receivedMessageRead.message) {
-                                deviceMessages[count] = {
-                                    timestamp: receivedMessageRead.timestamp,
-                                    accessId: receivedMessageRead.accessId,
-                                    deviceId: receivedMessageRead.deviceId,
-                                    messageId: receivedMessageRead.messageId,
-                                    message: receivedMessageRead.message
-                                }
-                                count++;
-                            }
-                        });
-                        if(this.siGatewayCallback && receivedMessagesRead[0].status && receivedMessagesRead[0].count) {
-                            this.siGatewayCallback.onMessageRead(statusFromString(receivedMessagesRead[0].status),+receivedMessagesRead[0].count
-                                , deviceMessages);
+                        const content = SIGatewayClient.decodeMessagesReadFrame(event.data);
+                        if (this.siGatewayCallback && content.status !== undefined && content.count !== undefined && content.messages !== undefined) {
+                            this.siGatewayCallback.onMessageRead(content.status, content.count, content.messages);
                         }
                         break;
+
                     default:
                         SIProtocolError.raise("unsupported frame command :"+command);
                 }
             }
-        }
+        };
         this.ws.onclose = (/*event:Event*/)=>{
             this.setStateSI(SIConnectionState.DISCONNECTED);
             this.accessLevel = SIAccessLevel.NONE;
             this.siGatewayCallback?.onDisconnected();
-        }
-        this.ws.onerror = (event:Event)=>{
+        };
+        this.ws.onerror = (/*event:Event*/)=>{
             this.siGatewayCallback?.onError("Error occurs on the websocket");
         }
     }
@@ -1440,7 +1200,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * device access, "demo.*.3136" represents all properties with ID 3136 on any device that disposes that property
      * connected through the device access "demo" and finally "*.*.3136" represents all properties with ID 3136 on any
      * device that disposes that property connected through any device access.
-     * @param property_id: The search wildcard ID.
+     * @param propertyId: The search wildcard ID.
      * @raises SIProtocolError: On a connection, protocol of framing error.
      */
     public findProperties(propertyId:string){
