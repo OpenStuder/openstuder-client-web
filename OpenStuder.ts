@@ -18,7 +18,7 @@ export enum SIStatus {
     NO_DEVICE = -3,
     NO_DEVICE_ACCESS = -4,
     TIMEOUT = -5,
-    INVALID_VALUE = -6,
+    INVALID_VALUE = -6
 }
 
 function statusFromString(str: string): SIStatus {
@@ -57,7 +57,7 @@ export enum SIConnectionState {
     DISCONNECTED,
     CONNECTING,
     AUTHORIZING,
-    CONNECTED,
+    CONNECTED
 }
 
 /**
@@ -71,7 +71,7 @@ export enum SIConnectionState {
  * only for qualified service personnel.
  */
 export enum SIAccessLevel {
-    NONE,
+    NONE = 0,
     BASIC,
     INSTALLER,
     EXPERT,
@@ -104,11 +104,12 @@ function accessLevelFromString(str: string): SIAccessLevel {
  * -SIDescriptionFlags.INCLUDE_DRIVER_INFORMATION: Include device property information.
  * -SIDescriptionFlags.INCLUDE_DRIVER_INFORMATION: Include device access driver information.
  */
-export enum SIDescriptionFlags{
+export enum SIDescriptionFlags {
+    NONE = 0,
     INCLUDE_ACCESS_INFORMATION,
     INCLUDE_PROPERTY_INFORMATION,
     INCLUDE_DEVICE_INFORMATION,
-    INCLUDE_DRIVER_INFORMATION ,
+    INCLUDE_DRIVER_INFORMATION
 }
 
 /**
@@ -117,9 +118,9 @@ export enum SIDescriptionFlags{
  * -SIWriteFlags.NONE: No write flags.
  * -SIWriteFlags.PERMANENT: Write the change to the persistent storage, eg the change lasts reboots.
  */
-export enum SIWriteFlags{
-    NONE=0,
-    PERMANENT=1,
+export enum SIWriteFlags {
+    NONE = 0,
+    PERMANENT
 }
 
 /**
@@ -133,6 +134,21 @@ type DecodedFrame={
     command:string,
     body:string,
     headers:Map<string,string>
+}
+
+/**
+ * @class SIProtocolError
+ * Class for reporting all OpenStuder protocol errors.
+ */
+class SIProtocolError extends Error {
+    constructor(message: string) {
+        super(message);
+        Object.setPrototypeOf(this, SIProtocolError.prototype);
+    }
+
+    static raise(message: string) {
+        throw new SIProtocolError(message);
+    }
 }
 
 /**
@@ -181,16 +197,6 @@ export type SIDeviceMessage={
     deviceId:string,
     messageId:string,
     message:string
-}
-
-/**
- * @class SIProtocolError
- * Class for reporting all OpenStuder protocol errors.
- */
-class SIProtocolError{
-    static raise(error:string){
-        throw new Error(error);
-    }
 }
 
 /**
