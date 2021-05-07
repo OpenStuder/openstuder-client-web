@@ -10,7 +10,7 @@
  * -SIStatus.TIMEOUT: A timeout occurred when waiting for the completion of the operation.
  * -SIStatus.INVALID_VALUE: A invalid value was passed.
  */
-export enum SIStatus{
+export enum SIStatus {
     SUCCESS = 0,
     IN_PROGRESS = 1,
     ERROR = -1,
@@ -21,8 +21,8 @@ export enum SIStatus{
     INVALID_VALUE = -6,
 }
 
-function SIStatusFromString(str:string):SIStatus{
-    switch(str){
+function statusFromString(str: string): SIStatus {
+    switch (str) {
         case "Success":
             return SIStatus.SUCCESS;
         case "InProgress":
@@ -53,7 +53,7 @@ function SIStatusFromString(str:string):SIStatus{
  * and the client is authorizing.
  * -SIConnectionState.CONNECTED: The WebSocket connection is established and the client is authorized, ready to use.
  */
-export enum SIConnectionState{
+export enum SIConnectionState {
     DISCONNECTED,
     CONNECTING,
     AUTHORIZING,
@@ -70,7 +70,7 @@ export enum SIConnectionState{
  * -QUALIFIED_SERVICE_PERSONNEL: Expert and all configuration and service properties
  * only for qualified service personnel.
  */
-export enum SIAccessLevel{
+export enum SIAccessLevel {
     NONE,
     BASIC,
     INSTALLER,
@@ -78,8 +78,8 @@ export enum SIAccessLevel{
     QUALIFIED_SERVICE_PERSONNEL
 }
 
-function SIAccessLevelFromString(str:string):SIAccessLevel{
-    switch(str){
+function accessLevelFromString(str: string): SIAccessLevel {
+    switch (str) {
         case("None"):
             return SIAccessLevel.NONE;
         case("Basic"):
@@ -501,7 +501,7 @@ class SIAbstractGatewayClient {
                         id:"",
                         value:""
                     };
-                    temp.status=SIStatusFromString(jsonBody[i].status);
+                    temp.status=statusFromString(jsonBody[i].status);
                     temp.id=jsonBody[i].id;
                     temp.value=jsonBody[i].value;
                     retVal.push(temp);
@@ -620,7 +620,7 @@ class SIAbstractGatewayClient {
                         status:SIStatus.ERROR,
                         id:"",
                     };
-                    temp.status=SIStatusFromString(jsonBody[i].status);
+                    temp.status=statusFromString(jsonBody[i].status);
                     temp.id=jsonBody[i].id;
                     retVal.push(temp);
                 }
@@ -693,7 +693,7 @@ class SIAbstractGatewayClient {
                         status:SIStatus.ERROR,
                         id:"",
                     };
-                    temp.status=SIStatusFromString(jsonBody[i].status);
+                    temp.status=statusFromString(jsonBody[i].status);
                     temp.id=jsonBody[i].id;
                     retVal.push(temp);
                 }
@@ -1131,13 +1131,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                     this.setStateSI(SIConnectionState.CONNECTED);
                     receivedMessage = SIGatewayClient.decodeAuthorizedFrame(event.data);
                     if (receivedMessage.accessLevel) {
-                        this.accessLevel = SIAccessLevelFromString(receivedMessage.accessLevel);
+                        this.accessLevel = accessLevelFromString(receivedMessage.accessLevel);
                     }
                     if (receivedMessage.gatewayVersion) {
                         this.gatewayVersion = receivedMessage.gatewayVersion;
                     }
                     if (this.siGatewayCallback && receivedMessage.accessLevel && receivedMessage.gatewayVersion) {
-                        this.siGatewayCallback.onConnected(SIAccessLevelFromString(receivedMessage.accessLevel), receivedMessage.gatewayVersion);
+                        this.siGatewayCallback.onConnected(accessLevelFromString(receivedMessage.accessLevel), receivedMessage.gatewayVersion);
                     }
                 } else if (command === "ERROR") {
                     if(this.siGatewayCallback) {
@@ -1159,25 +1159,25 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                     case "ENUMERATED":
                         receivedMessage = SIGatewayClient.decodeEnumerateFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.deviceCount) {
-                            this.siGatewayCallback.onEnumerated(SIStatusFromString(receivedMessage.status),+receivedMessage.deviceCount);
+                            this.siGatewayCallback.onEnumerated(statusFromString(receivedMessage.status),+receivedMessage.deviceCount);
                         }
                         break;
                     case "DESCRIPTION":
                         receivedMessage = SIGatewayClient.decodeDescriptionFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.body) {
-                            this.siGatewayCallback.onDescription(SIStatusFromString(receivedMessage.status),receivedMessage.body,receivedMessage.id);
+                            this.siGatewayCallback.onDescription(statusFromString(receivedMessage.status),receivedMessage.body,receivedMessage.id);
                         }
                         break;
                     case "PROPERTIES FOUND":
                         receivedMessage = SIGatewayClient.decodePropertiesFoundFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id && receivedMessage.count && receivedMessage.listProperty){
-                            this.siGatewayCallback.onPropertiesFound(SIStatusFromString(receivedMessage.status), receivedMessage.id, +receivedMessage.count, receivedMessage.listProperty);
+                            this.siGatewayCallback.onPropertiesFound(statusFromString(receivedMessage.status), receivedMessage.id, +receivedMessage.count, receivedMessage.listProperty);
                         }
                         break;
                     case "PROPERTY READ":
                         receivedMessage = SIGatewayClient.decodePropertyReadFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
-                            this.siGatewayCallback.onPropertyRead(SIStatusFromString(receivedMessage.status),receivedMessage.id,receivedMessage.value);
+                            this.siGatewayCallback.onPropertyRead(statusFromString(receivedMessage.status),receivedMessage.id,receivedMessage.value);
                         }
                         break;
                     case "PROPERTIES READ":
@@ -1190,13 +1190,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                         receivedMessage = SIGatewayClient.decodePropertyWrittenFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
                             //status:SIStatus, propertyId:string
-                            this.siGatewayCallback.onPropertyWritten(SIStatusFromString(receivedMessage.status),receivedMessage.id);
+                            this.siGatewayCallback.onPropertyWritten(statusFromString(receivedMessage.status),receivedMessage.id);
                         }
                         break;
                     case "PROPERTY SUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertySubscribedFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
-                            this.siGatewayCallback.onPropertySubscribed(SIStatusFromString(receivedMessage.status),receivedMessage.id);
+                            this.siGatewayCallback.onPropertySubscribed(statusFromString(receivedMessage.status),receivedMessage.id);
                         }
                         break;
                     case "PROPERTIES SUBSCRIBED":
@@ -1208,7 +1208,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                     case "PROPERTY UNSUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertyUnsubscribedFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.id) {
-                            this.siGatewayCallback.onPropertyUnsubscribed(SIStatusFromString(receivedMessage.status),receivedMessage.id);
+                            this.siGatewayCallback.onPropertyUnsubscribed(statusFromString(receivedMessage.status),receivedMessage.id);
                         }
                         break;
                     case "PROPERTIES UNSUBSCRIBED":
@@ -1227,11 +1227,11 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                         receivedMessage = SIGatewayClient.decodeDatalogReadFrame(event.data);
                         if(this.siGatewayCallback && receivedMessage.status && receivedMessage.body && receivedMessage.count) {
                             if(receivedMessage.id){
-                                this.siGatewayCallback.onDatalogRead(SIStatusFromString(receivedMessage.status),receivedMessage.id, +receivedMessage.count, receivedMessage.body);
+                                this.siGatewayCallback.onDatalogRead(statusFromString(receivedMessage.status),receivedMessage.id, +receivedMessage.count, receivedMessage.body);
                             }
                             else {
                                 let properties = receivedMessage.body.split("\n");
-                                this.siGatewayCallback.onDatalogPropertiesRead(SIStatusFromString(receivedMessage.status), properties);
+                                this.siGatewayCallback.onDatalogPropertiesRead(statusFromString(receivedMessage.status), properties);
                             }
                         }
                         break;
@@ -1268,7 +1268,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
                             }
                         });
                         if(this.siGatewayCallback && receivedMessagesRead[0].status && receivedMessagesRead[0].count) {
-                            this.siGatewayCallback.onMessageRead(SIStatusFromString(receivedMessagesRead[0].status),+receivedMessagesRead[0].count
+                            this.siGatewayCallback.onMessageRead(statusFromString(receivedMessagesRead[0].status),+receivedMessagesRead[0].count
                                 , deviceMessages);
                         }
                         break;
