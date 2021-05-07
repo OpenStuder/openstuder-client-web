@@ -200,7 +200,7 @@ class SIProtocolError{
 class SIAbstractGatewayClient {
     /**
      * Function used to separate the information into a "DecodedFrame" instance
-     * @param frame FSrame to be decoded
+     * @param frame Frame to be decoded
      */
     protected static decodeFrame(frame:string):DecodedFrame{
         let command:string="INVALID";
@@ -254,7 +254,7 @@ class SIAbstractGatewayClient {
      * @param password Password for the user
      */
     protected static encodeAuthorizeFrame(user?:string, password?:string):string{
-        if(user!==undefined || password !== undefined) {
+        if(user!== "" || password !== "") {
             return "AUTHORIZE\nuser:" + user + "\npassword:" + password + "\nprotocol_version:1\n\n";
         }
         else{
@@ -1056,6 +1056,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
     private accessLevel: SIAccessLevel;
     private gatewayVersion: string;
     private ws: WebSocket|null;
+    private connectionTimeout: number = -1;
 
     private user?:string;
     private password?:string;
@@ -1098,16 +1099,23 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
      * @param port TCP port used for the connection to the OpenStuder gateway, defaults to 1987
      * @param user Username send to the gateway used for authorization.
      * @param password Password send to the gateway used for authorization.
+     * @param connectionTimeout Connection timeout in milliseconds, defaults to 5000 if not provided.
      */
-    public connect(host:string,port:number = 1987,user?:string,password?:string) {
+    public connect(host:string,port:number = 1987,user?:string,password?:string, connectionTimeout: number = 5000) {
         this.ensureInState(SIConnectionState.DISCONNECTED);
-        if(user && password){
-            this.user=user;
-            this.password=password;
-        }
+        this.user=user || "";
+        this.password=password || "";
         this.ws = new WebSocket(host + ':' + port);
         this.setStateSI(SIConnectionState.CONNECTING);
+        this.connectionTimeout = window.setTimeout(() => {
+            if (this.state === SIConnectionState.CONNECTING) {
+                this.ws?.close();
+                this.siGatewayCallback?.onError("connect timeout");
+            }
+
+        }, connectionTimeout);
         this.ws.onopen = (/*event:Event*/)=>{
+            clearTimeout(this.connectionTimeout);
             this.setStateSI(SIConnectionState.AUTHORIZING);
             let frame = SIGatewayClient.encodeAuthorizeFrame(this.user, this.password);
             if(this.ws){
