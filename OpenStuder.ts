@@ -1,23 +1,45 @@
 /**
  * Status of operations on the OpenStuder gateway.
- *
- * -SIStatus.SUCCESS: Operation was successfully completed.
- * -SIStatus.IN_PROGRESS: Operation is already in progress or another operation is occupying the resource.
- * -SIStatus.ERROR: General (unspecified) error.
- * -SIStatus.NO_PROPERTY: The property does not exist or the user's access level does not allow to access the property.
- * -SIStatus.NO_DEVICE: The device does not exist.
- * -SIStatus.NO_DEVICE_ACCESS: The device access instance does not exist.
- * -SIStatus.TIMEOUT: A timeout occurred when waiting for the completion of the operation.
- * -SIStatus.INVALID_VALUE: A invalid value was passed.
  */
 export enum SIStatus {
+    /**
+     * Operation was successfully completed.
+     */
     SUCCESS = 0,
+
+    /**
+     * Operation is already in progress or another operation is occupying the resource.
+     */
     IN_PROGRESS = 1,
+
+    /**
+     * General (unspecified) error.
+     */
     ERROR = -1,
+
+    /**
+     * The property does not exist or the user's access level does not allow to access the property.
+     */
     NO_PROPERTY = -2,
+
+    /**
+     * The device does not exist.
+     */
     NO_DEVICE = -3,
+
+    /**
+     * The device access instance does not exist.
+     */
     NO_DEVICE_ACCESS = -4,
+
+    /**
+     * A timeout occurred when waiting for the completion of the operation.
+     */
     TIMEOUT = -5,
+
+    /**
+     * A invalid value was passed.
+     */
     INVALID_VALUE = -6
 }
 
@@ -46,35 +68,56 @@ function statusFromString(str: string): SIStatus {
 
 /**
  * State of the connection to the OpenStuder gateway.
- *
- * -SIConnectionState.DISCONNECTED: The client is not connected.
- * -SIConnectionState.CONNECTING: The client is establishing the WebSocket connection to the gateway.
- * -SIConnectionState.AUTHORIZING: The WebSocket connection to the gateway has been established
- * and the client is authorizing.
- * -SIConnectionState.CONNECTED: The WebSocket connection is established and the client is authorized, ready to use.
  */
 export enum SIConnectionState {
+    /**
+     * The client is not connected.
+     */
     DISCONNECTED,
+
+    /**
+     * The client is establishing the WebSocket connection to the gateway.
+     */
     CONNECTING,
+
+    /**
+     * The WebSocket connection to the gateway has been established and the client is authorizing.
+     */
     AUTHORIZING,
+
+    /**
+     * The WebSocket connection is established and the client is authorized, ready to use.
+     */
     CONNECTED
 }
 
 /**
  * Level of access granted to a client from the OpenStuder gateway.
- *
- * -NONE: No access at all.
- * -BASIC: Basic access to device information properties (configuration excluded).
- * -INSTALLER: Basic access + additional access to most common configuration properties.
- * -EXPERT: Installer + additional advanced configuration properties.
- * -QUALIFIED_SERVICE_PERSONNEL: Expert and all configuration and service properties
- * only for qualified service personnel.
  */
 export enum SIAccessLevel {
+    /**
+     * No access at all.
+     */
     NONE = 0,
+
+    /**
+     * Basic access to device information properties (configuration excluded).
+     */
     BASIC,
+
+    /**
+     * Basic access + additional access to most common configuration properties.
+     */
     INSTALLER,
+
+    /**
+     * Installer + additional advanced configuration properties.
+     */
     EXPERT,
+
+    /**
+     * Expert and all configuration and service properties only for qualified service personnel.
+     */
     QUALIFIED_SERVICE_PERSONNEL
 }
 
@@ -97,34 +140,50 @@ function accessLevelFromString(str: string): SIAccessLevel {
 
 /**
  * Flags to control the format of the "DESCRIBE" functionality.
- *
- * -SIDescriptionFlags.NONE: No description flags.
- * -SIDescriptionFlags.INCLUDE_ACCESS_INFORMATION: Includes device access instances information.
- * -SIDescriptionFlags.INCLUDE_DEVICE_INFORMATION: Include device information.
- * -SIDescriptionFlags.INCLUDE_DRIVER_INFORMATION: Include device property information.
- * -SIDescriptionFlags.INCLUDE_DRIVER_INFORMATION: Include device access driver information.
  */
 export enum SIDescriptionFlags {
+    /**
+     * No description flags.
+     */
     NONE = 0,
+
+    /**
+     * Includes device access instances information.
+     */
     INCLUDE_ACCESS_INFORMATION,
+
+    /**
+     * Include device information.
+     */
     INCLUDE_PROPERTY_INFORMATION,
+
+    /**
+     * Include device property information.
+     */
     INCLUDE_DEVICE_INFORMATION,
+
+    /**
+     * Include device access driver information.
+     */
     INCLUDE_DRIVER_INFORMATION
 }
 
 /**
  * Flags to control write property operation.
- *
- * -SIWriteFlags.NONE: No write flags.
- * -SIWriteFlags.PERMANENT: Write the change to the persistent storage, eg the change lasts reboots.
  */
 export enum SIWriteFlags {
+    /**
+     * No write flags.
+     */
     NONE = 0,
+
+    /**
+     * Write the change to the persistent storage, eg the change lasts reboots.
+     */
     PERMANENT
 }
 
 /**
- * @class SIProtocolError
  * Class for reporting all OpenStuder protocol errors.
  */
 class SIProtocolError extends Error {
@@ -142,7 +201,6 @@ class SIProtocolError extends Error {
  * The SIDeviceMessage class represents a message a device connected to the OpenStuder gateway has broadcast.
  */
 export type SIDeviceMessage = { // TODO: Create class.
-
     /**
      * Timestamp when the device message was received by the gateway.
      */
@@ -167,6 +225,41 @@ export type SIDeviceMessage = { // TODO: Create class.
      * String representation of the message.
      */
     message: string
+}
+
+/**
+ * The SIDPropertyReadResult class represents the status of a property read result.
+ */
+export type SIPropertyReadResult = {
+    /**
+     * Status of the property read operation.
+     */
+    status: SIStatus,
+
+    /**
+     * ID of the property read.
+     */
+    id: string,
+
+    /**
+     * Value that was read from the property, optional.
+     */
+    value?: any
+}
+
+/**
+ * The SIDSubscriptionsResult class represents the status of a property subscription/unsubscription.
+ */
+export type SISubscriptionsResult = {
+    /**
+     * Status of the property subscribe or unsubscribe operation.
+     */
+    status: SIStatus,
+
+    /**
+     * ID of the property.
+     */
+    id: string
 }
 
 /**
@@ -203,27 +296,10 @@ type DecodedFrame={
 }
 
 /**
- * The SIDPropertyReadResult class represents the status of a property read result.
- */
-export type SIPropertyReadResult={
-    status:SIStatus,
-    id:string,
-    value?:any,
-}
-
-/**
- * The SIDSubscriptionsResult class represents the status of a property subscription/unsubscription.
- */
-export type SISubscriptionsResult={
-    status:SIStatus,
-    id:string,
-}
-
-/**
  * @class SIAbstractGatewayClient
  * Abstract gateway to gives mandatory function to treat the frame with the defined websocket protocol
  */
-class SIAbstractGatewayClient {
+class SIAbstractGatewayClient { // TODO: There is only one subclass, no need for the abstract class.
     /**
      * Function used to separate the information into a "DecodedFrame" instance
      * @param frame Frame to be decoded
