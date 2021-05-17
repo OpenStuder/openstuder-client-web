@@ -944,8 +944,8 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }
     }
 
-    public setCallback(siGatewayCallback:SIGatewayClientCallbacks){
-        this.siGatewayCallback=siGatewayCallback;
+    public setCallback(siGatewayCallback: SIGatewayClientCallbacks | undefined) {
+        this.siGatewayCallback = siGatewayCallback;
     }
 
     /**
