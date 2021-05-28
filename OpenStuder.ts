@@ -304,8 +304,8 @@ class SIAbstractGatewayClient {
             }
             // If our components has a timestamp, it will have several ':'
             if (components.length > 2) {
-                let value = "";
-                for (let i = 1; i < components.length; i++) {
+                let value = components[1];
+                for (let i = 2; i < components.length; i++) {
                     value += ":" + components[i];
                 }
                 headers.set(components[0], value);
