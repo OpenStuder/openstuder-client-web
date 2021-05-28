@@ -187,7 +187,7 @@ export enum SIWriteFlags {
 /**
  * Class for reporting all OpenStuder protocol errors.
  */
-class SIProtocolError extends Error {
+export class SIProtocolError extends Error {
     constructor(message: string) {
         super(message);
         Object.setPrototypeOf(this, SIProtocolError.prototype);
