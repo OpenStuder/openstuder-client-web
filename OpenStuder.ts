@@ -205,7 +205,7 @@ export type SIDeviceMessage = { // TODO: Create class.
     /**
      * Timestamp when the device message was received by the gateway.
      */
-    timestamp: string // TODO: Better type would be Date.
+    timestamp: Date
 
     /**
      * ID of the device access driver that received the message.
@@ -698,7 +698,7 @@ class SIAbstractGatewayClient {
                 const jsonBody = JSON.parse(decodedFrame.body);
                 for (let i = 0; i < jsonBody.length; i++) {
                     messages.push({
-                        timestamp: jsonBody[i].timestamp,
+                        timestamp: new Date(jsonBody[i].timestamp),
                         accessId: jsonBody[i].access_id,
                         deviceId: jsonBody[i].device_id,
                         messageId: jsonBody[i].message_id,
@@ -730,7 +730,7 @@ class SIAbstractGatewayClient {
         if (decodedFrame.command === "DEVICE MESSAGE" && decodedFrame.headers.has("access_id") && decodedFrame.headers.has("device_id") &&
             decodedFrame.headers.has("message_id") && decodedFrame.headers.has("message") && decodedFrame.headers.has("timestamp")) {
             return {
-                timestamp: decodedFrame.headers.get("timestamp")!,
+                timestamp: new Date(decodedFrame.headers.get("timestamp")!),
                 accessId: decodedFrame.headers.get("access_id")!,
                 deviceId: decodedFrame.headers.get("device_id")!,
                 messageId: decodedFrame.headers.get("message_id")!,
@@ -741,7 +741,7 @@ class SIAbstractGatewayClient {
         } else {
             SIProtocolError.raise("unknown error receiving device message");
         }
-        return {accessId: "", deviceId: "", message: "", messageId: "", timestamp: ""};
+        return {accessId: "", deviceId: "", message: "", messageId: "", timestamp: new Date(0)};
     }
 
     protected static getTimestampHeaderIfPresent(key: string, timestamp?: Date): string {
