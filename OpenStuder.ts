@@ -188,7 +188,7 @@ export enum SIWriteFlags {
  * Class for reporting all OpenStuder protocol errors.
  */
 export class SIProtocolError extends Error {
-    constructor(message: string) {
+    public constructor(message: string) {
         super(message);
         Object.setPrototypeOf(this, SIProtocolError.prototype);
     }
@@ -201,7 +201,7 @@ export class SIProtocolError extends Error {
 /**
  * The SIDeviceMessage class represents a message a device connected to the OpenStuder gateway has broadcast.
  */
-export type SIDeviceMessage = { // TODO: Create class.
+export type SIDeviceMessage = {
     /**
      * Timestamp when the device message was received by the gateway.
      */
@@ -779,12 +779,6 @@ export interface SIGatewayClientCallbacks {
     onDisconnected():void;
 
     /**
-     * Called when the state of the connection changed
-     * @param state new state of the connection
-     */
-    onConnectionStateChanged(state:SIConnectionState):void;
-
-    /**
      * Called when the enumeration operation started using enumerate() has completed on the gateway.
      * @param status Operation status.
      * @param deviceCount Number of devices present
@@ -910,37 +904,32 @@ export interface SIGatewayClientCallbacks {
  * version. The advantages are that long operations do not block the main thread as all results are reported
  * using callbacks, device message indications are supported and subscriptions to property changes are possible.
  */
-export class SIGatewayClient extends SIAbstractGatewayClient{
-    //Attributes
+export class SIGatewayClient extends SIAbstractGatewayClient {
     private state: SIConnectionState;
     private accessLevel: SIAccessLevel;
     private gatewayVersion: string;
-    private ws: WebSocket|null;
+    private ws: WebSocket | null;
     private connectionTimeout: number = -1;
 
-    private user?:string;
-    private password?:string;
+    private user?: string;
+    private password?: string;
 
-    private siGatewayCallback:SIGatewayClientCallbacks | undefined;
+    private siGatewayCallback: SIGatewayClientCallbacks | undefined;
 
-    public constructor(){
+    public constructor() {
         super();
         this.state = SIConnectionState.DISCONNECTED;
-        this.gatewayVersion='';
-        this.accessLevel=SIAccessLevel.NONE;
-        this.ws=null;
+        this.ws = null;
+        this.accessLevel = SIAccessLevel.NONE;
+        this.gatewayVersion = '';
+
+        this.user = undefined;
+        this.password = undefined;
     }
 
-    protected ensureInState(state:SIConnectionState){
-        if(state!==this.state){
-            SIProtocolError.raise("invalid client state");
-        }
-    }
-
-    protected setStateSI(state:SIConnectionState){
-        this.state=state;
-        if(this.siGatewayCallback) {
-            this.siGatewayCallback.onConnectionStateChanged(this.state);
+    private ensureInState(state: SIConnectionState) {
+        if (state !== this.state) {
+            throw new SIProtocolError("invalid client state");
         }
     }
 
@@ -966,7 +955,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         this.user=user || "";
         this.password=password || "";
         this.ws = new WebSocket(host + ':' + port);
-        this.setStateSI(SIConnectionState.CONNECTING);
+        this.state = SIConnectionState.CONNECTING;
         this.connectionTimeout = window.setTimeout(() => {
             if (this.state === SIConnectionState.CONNECTING) {
                 this.ws?.close();
@@ -976,7 +965,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
         }, connectionTimeout);
         this.ws.onopen = (/*event:Event*/)=>{
             clearTimeout(this.connectionTimeout);
-            this.setStateSI(SIConnectionState.AUTHORIZING);
+            this.state = SIConnectionState.AUTHORIZING;
             let frame = SIGatewayClient.encodeAuthorizeFrame(this.user, this.password);
             if(this.ws){
                 this.ws.send(frame);
@@ -988,7 +977,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
             // In AUTHORIZE state, we only handle AUTHORIZED messages
             if(this.state===SIConnectionState.AUTHORIZING){
                 if (command === "AUTHORIZED") {
-                    this.setStateSI(SIConnectionState.CONNECTED);
+                    this.state = SIConnectionState.CONNECTED;
                     receivedMessage = SIGatewayClient.decodeAuthorizedFrame(event.data);
                     if (receivedMessage.accessLevel) {
                         this.accessLevel = accessLevelFromString(receivedMessage.accessLevel);
@@ -1128,7 +1117,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
             }
         };
         this.ws.onclose = (/*event:Event*/)=>{
-            this.setStateSI(SIConnectionState.DISCONNECTED);
+            this.state = SIConnectionState.DISCONNECTED;
             this.accessLevel = SIAccessLevel.NONE;
             this.siGatewayCallback?.onDisconnected();
         };
@@ -1374,6 +1363,6 @@ export class SIGatewayClient extends SIAbstractGatewayClient{
 }
 
 /**
-* @deprecated The method should not be used
+* @deprecated Use SIGatewayClientCallbacks instead.
 */
 export type SIGatewayCallback = SIGatewayClientCallbacks;
