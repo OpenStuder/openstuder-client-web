@@ -35,6 +35,12 @@ declare namespace OpenStuder {
         id: string,
     };
 
+    class SIProtocolError {
+        public constructor(message: string);
+
+        static raise(message: string):void;
+    }
+
     interface SIGatewayClientCallbacks {
         onConnected(accessLevel: SIAccessLevel, gatewayVersion: string): void;
 
@@ -85,13 +91,13 @@ declare namespace OpenStuder {
         private user?: string;
         private password?: string;
 
-        private siGatewayCallback: SIGatewayCallback | undefined;
+        private siGatewayCallback: SIGatewayClientCallbacks | undefined;
 
         constructor();
 
         public connect(host: string, port?: number, user?: string, password?: string);
 
-        public setCallback(siGatewayCallback: SIGatewayCallback);
+        public setCallback(siGatewayCallback: SIGatewayClientCallbacks);
 
         public getState(): SIConnectionState;
 
