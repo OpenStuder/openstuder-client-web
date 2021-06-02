@@ -35,7 +35,7 @@ declare namespace OpenStuder {
         id: string,
     };
 
-    interface SIGatewayCallback {
+    interface SIGatewayClientCallbacks {
         onConnected(accessLevel: SIAccessLevel, gatewayVersion: string): void;
 
         onDisconnected(): void;

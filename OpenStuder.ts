@@ -1432,8 +1432,3 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.siGatewayCallback?.onDisconnected();
     };
 }
-
-/**
- * @deprecated Use SIGatewayClientCallbacks instead.
- */
-export type SIGatewayCallback = SIGatewayClientCallbacks;
