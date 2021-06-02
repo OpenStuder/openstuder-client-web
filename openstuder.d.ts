@@ -46,8 +46,6 @@ declare namespace OpenStuder {
 
         onDisconnected(): void;
 
-        onConnectionStateChanged(state: SIConnectionState): void;
-
         onEnumerated(status: SIStatus, deviceCount: number): void;
 
         onError(reason: string): void;
