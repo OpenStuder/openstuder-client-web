@@ -347,7 +347,7 @@ class SIAbstractGatewayClient {
             } else {
                 SIProtocolError.raise("protocol version 1 not supported by server");
             }
-        } else if (decodedFrame.command === "Error" && decodedFrame.headers.has("reason")) {
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during authorization");
@@ -1270,22 +1270,20 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
 
             // In AUTHORIZE state, we only handle AUTHORIZED messages
             if (this.state === SIConnectionState.AUTHORIZING) {
-                if (command === "AUTHORIZED") {
-                    receivedMessage = SIGatewayClient.decodeAuthorizedFrame(event.data);
-                    if (receivedMessage.accessLevel) {
-                        this.accessLevel = accessLevelFromString(receivedMessage.accessLevel);
-                    }
-                    if (receivedMessage.gatewayVersion) {
-                        this.gatewayVersion = receivedMessage.gatewayVersion;
-                    }
+                receivedMessage = SIGatewayClient.decodeAuthorizedFrame(event.data);
+                if (receivedMessage.accessLevel) {
+                    this.accessLevel = accessLevelFromString(receivedMessage.accessLevel);
+                }
+                if (receivedMessage.gatewayVersion) {
+                    this.gatewayVersion = receivedMessage.gatewayVersion;
+                }
 
-                    // Change state to CONNECTED.
-                    this.state = SIConnectionState.CONNECTED;
+                // Change state to CONNECTED.
+                this.state = SIConnectionState.CONNECTED;
 
-                    // Call callback if present.
-                    if (this.siGatewayCallback && receivedMessage.accessLevel && receivedMessage.gatewayVersion) {
-                        this.siGatewayCallback.onConnected(this.accessLevel, this.gatewayVersion);
-                    }
+                // Call callback if present.
+                if (this.siGatewayCallback && receivedMessage.accessLevel && receivedMessage.gatewayVersion) {
+                    this.siGatewayCallback.onConnected(this.accessLevel, this.gatewayVersion);
                 }
             }
 
