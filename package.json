@@ -1,5 +1,5 @@
 {
-  "name": "gateway-client-web",
+  "name": "@openstuder/openstuder",
   "version": "0.3.4",
   "description": "Web client to connect to OpenStuder gateway via WebSocket.",
   "main": "openstuder.js",
