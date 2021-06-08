@@ -1,0 +1,30 @@
+{
+  "name": "gateway-client-web",
+  "version": "0.3.4",
+  "description": "Web client to connect to OpenStuder gateway via WebSocket.",
+  "main": "openstuder.js",
+  "types": "openstuder.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenStuder/gateway-client-web.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/OpenStuder/gateway-client-web/issues"
+  },
+  "homepage": "https://github.com/OpenStuder/gateway-client-web#readme",
+  "devDependencies": {
+    "typescript": "^4.3.2"
+  },
+  "files": [
+    "openstuder.js",
+    "openstuder.d.ts",
+    "openstuder.js.map"
+  ]
+}
