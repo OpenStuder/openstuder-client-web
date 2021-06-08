@@ -24,3 +24,7 @@ yarn-error.log*
 
 .eslintcache
 .idea
+
+*.d.ts
+*.js
+*.js.map
