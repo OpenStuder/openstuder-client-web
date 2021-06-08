@@ -17,7 +17,7 @@ declare namespace OpenStuder {
     enum SIWriteFlags {NONE, PERMANENT}
 
     type SIDeviceMessage = {
-        timestamp: string,
+        timestamp: Date,
         accessId: string,
         deviceId: string,
         messageId: string,
