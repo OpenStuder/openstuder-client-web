@@ -499,7 +499,6 @@ class SIAbstractGatewayClient {
             frame += "\n";
         }
         frame += "\n";
-        console.log(frame);
         return frame;
     }
 
@@ -2291,7 +2290,6 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
 
         let frame = this.frame;
         this.frame = new Uint8Array(0);
-        console.log("RX: " + bytesToHex(frame));
 
         try {
             const command = SIBluetoothGatewayClient.peekFrameCommand(frame);
@@ -2399,7 +2397,6 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
     }
 
     private txSend(payload: Uint8Array) {
-        console.log("TX: " + bytesToHex(payload));
         const MAX_FRAGMENT_SIZE = 508; // TODO: Detect or make configurable.
         let fragmentCount = Math.ceil(payload.length / MAX_FRAGMENT_SIZE);
         while (fragmentCount > 0) {
