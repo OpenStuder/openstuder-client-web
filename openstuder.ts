@@ -192,6 +192,46 @@ export enum SIWriteFlags {
 }
 
 /**
+ * Device functions, these can be used to filter results during the find property operation. Note that a device can hold multiple functions.
+ */
+export enum SIDeviceFunctions {
+    /**
+     * No function.
+     */
+    NONE = 0,
+
+    /**
+     * Inverter function.
+     */
+    INVERTER,
+
+    /**
+     * Battery charger function.
+     */
+    CHARGER,
+
+    /**
+     * Solar charger function.
+     */
+    SOLAR,
+
+    /**
+     * AC charger function.
+     */
+    TRANSFER,
+
+    /**
+     * Battery monitor function.
+     */
+    BATTERY,
+
+    /**
+     * All functions.
+     */
+    ALL
+}
+
+/**
  * Class for reporting all OpenStuder protocol errors.
  */
 export class SIProtocolError extends Error {
@@ -440,8 +480,27 @@ class SIAbstractGatewayClient {
         return {};
     }
 
-    protected static encodeFindPropertiesFrame(propertyId: string) {
-        return "FIND PROPERTIES\nid:" + propertyId + "\n\n";
+    protected static encodeFindPropertiesFrame(propertyId: string, virtual?: boolean, functionMask?: Array<SIDeviceFunctions>) {
+        let frame = "FIND PROPERTIES\nid:" + propertyId + "\n";
+        if (virtual !== null && virtual !== undefined) {
+            frame += "virtual:" + (virtual ? "true\n" : "false\n");
+        }
+        if (functionMask !== undefined && functionMask?.length !== 0) {
+            frame += "functions:";
+            functionMask.forEach(func => {
+                if (func === SIDeviceFunctions.INVERTER) frame += "inverter,";
+                if (func === SIDeviceFunctions.CHARGER) frame += "charger,";
+                if (func === SIDeviceFunctions.SOLAR) frame += "solar,";
+                if (func === SIDeviceFunctions.TRANSFER) frame += "transfer,";
+                if (func === SIDeviceFunctions.BATTERY) frame += "battery,";
+                if (func === SIDeviceFunctions.ALL) frame += "all,";
+            });
+            frame = frame.substring(0, frame.length - 1);
+            frame += "\n";
+        }
+        frame += "\n";
+        console.log(frame);
+        return frame;
     }
 
     protected static decodePropertiesFoundFrame(frame: string): SIFrameContent {
@@ -1059,14 +1118,16 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
      * through any device access.
      *
      * @param propertyId: The search wildcard ID.
+     * @param virtual: Optional to filter for virtual devices (true) or non-virtual devices (false, default).
+     * @param functionMask: Optional to filter for device functions. See SIDeviceFunctions for details. Defaults to all functions (SIDeviceFunctions.ALL).
      * @raises SIProtocolError: On a connection, protocol of framing error.
      */
-    public findProperties(propertyId: string) {
+    public findProperties(propertyId: string, virtual?: boolean, functionMask?: Array<SIDeviceFunctions>) {
         // Ensure that the client is in the CONNECTED state.
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send FIND PROPERTIES message to gateway.
-        this.ws?.send(SIGatewayClient.encodeFindPropertiesFrame(propertyId));
+        this.ws?.send(SIGatewayClient.encodeFindPropertiesFrame(propertyId, virtual, functionMask));
     }
 
     /**
