@@ -1,6 +1,6 @@
 {
   "name": "@openstuder/openstuder",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Web client to connect to OpenStuder gateway via WebSocket and Bluetooth.",
   "main": "openstuder.js",
   "types": "openstuder.d.ts",
