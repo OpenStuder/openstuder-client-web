@@ -374,6 +374,11 @@ type SIPropertyWrittenWSFrameContent = {
     id: string
 }
 
+type SIPropertySubscribedWSFrameContent = {
+    status: SIStatus,
+    id: string
+}
+
 // TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
@@ -664,19 +669,19 @@ class SIAbstractGatewayClient {
         return "SUBSCRIBE PROPERTY\nid:" + propertyId + "\n\n";
     }
 
-    protected static decodePropertySubscribedFrame(frame: string): SIFrameContent {
+    protected static decodePropertySubscribedFrame(frame: string): SIPropertySubscribedWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY SUBSCRIBED" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
             return {
                 status: statusFromString(decodedFrame.headers.get("status")),
-                id: decodedFrame.headers.get("id")
+                id: decodedFrame.headers.get("id")!
             };
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during property subscribe");
         }
-        return {};
+        return {id: "", status: SIStatus.ERROR};
     }
 
     protected static encodeSubscribePropertiesFrame(propertyIds: string[]): string {
@@ -1472,12 +1477,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         break;
                     }
 
-                    case "PROPERTY SUBSCRIBED":
-                        receivedMessage = SIGatewayClient.decodePropertySubscribedFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined) {
-                            this.siGatewayCallback.onPropertySubscribed(receivedMessage.status, receivedMessage.id);
+                    case "PROPERTY SUBSCRIBED": {
+                        const decoded = SIGatewayClient.decodePropertySubscribedFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onPropertySubscribed(decoded.status, decoded.id);
                         }
                         break;
+                    }
 
                     case "PROPERTIES SUBSCRIBED":
                         let receivedSubscriptionResult: SISubscriptionsResult[] = SIGatewayClient.decodePropertiesSubscribedFrame(event.data);
@@ -1602,7 +1608,7 @@ type SIPropertyWrittenBTFrameContent = {
     id: string
 }
 
-type SIPropertySubscribedFrameContent = {
+type SIPropertySubscribedBTFrameContent = {
     status: SIStatus,
     id: string
 }
@@ -1783,7 +1789,7 @@ class SIAbstractBluetoothGatewayClient {
         );
     }
 
-    protected static decodePropertySubscribedFrame(frame: Uint8Array): SIPropertySubscribedFrameContent {
+    protected static decodePropertySubscribedFrame(frame: Uint8Array): SIPropertySubscribedBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x86 && decoded.sequence.length === 2 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "string") {
