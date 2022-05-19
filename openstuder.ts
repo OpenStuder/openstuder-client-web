@@ -363,6 +363,12 @@ type SIPropertiesFoundWSFrameContent = {
     properties: Array<string> | undefined
 }
 
+type SIPropertyReadWSFrameContent = {
+    status: SIStatus,
+    id: string,
+    value: boolean | number | string | undefined
+}
+
 // TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
@@ -570,21 +576,21 @@ class SIAbstractGatewayClient {
         return "READ PROPERTY\nid:" + propertyId + "\n\n";
     }
 
-    protected static decodePropertyReadFrame(frame: string): SIFrameContent {
+    protected static decodePropertyReadFrame(frame: string): SIPropertyReadWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY READ" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
             const status = statusFromString(decodedFrame.headers.get("status"));
             return {
                 status: status,
-                id: decodedFrame.headers.get("id"),
-                value: status === SIStatus.SUCCESS ? decodedFrame.headers.get("value") : undefined
+                id: decodedFrame.headers.get("id")!,
+                value: status === SIStatus.SUCCESS ? decodedFrame.headers.get("value") || '' : undefined
             }
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during property read");
         }
-        return {};
+        return {id: "", status: SIStatus.ERROR, value: null};
     }
 
     protected static encodeReadPropertiesFrame(propertyIds: string[]): string {
@@ -936,7 +942,7 @@ export interface SIGatewayClientCallbacks {
      * @param propertyId ID of the property read.
      * @param value The value read.
      */
-    onPropertyRead(status: SIStatus, propertyId: string, value?: string): void;
+    onPropertyRead(status: SIStatus, propertyId: string, value?: string | number  | boolean): void;
 
     /**
      * Called when the multiple properties read operation started using readProperties() has completed on the gateway.
@@ -1438,12 +1444,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         break;
                     }
 
-                    case "PROPERTY READ":
-                        receivedMessage = SIGatewayClient.decodePropertyReadFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined) {
-                            this.siGatewayCallback.onPropertyRead(receivedMessage.status, receivedMessage.id, receivedMessage.value);
+                    case "PROPERTY READ": {
+                        const decoded = SIGatewayClient.decodePropertyReadFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onPropertyRead(decoded.status, decoded.id, decoded.value);
                         }
                         break;
+                    }
 
                     case "PROPERTIES READ":
                         let receivedPropertyResult = SIGatewayClient.decodePropertiesReadFrame(event.data);
