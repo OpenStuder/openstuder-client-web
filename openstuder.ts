@@ -369,6 +369,11 @@ type SIPropertyReadWSFrameContent = {
     value: boolean | number | string | undefined
 }
 
+type SIPropertyWrittenWSFrameContent = {
+    status: SIStatus,
+    id: string
+}
+
 // TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
@@ -590,7 +595,7 @@ class SIAbstractGatewayClient {
         } else {
             SIProtocolError.raise("unknown error during property read");
         }
-        return {id: "", status: SIStatus.ERROR, value: null};
+        return {id: "", status: SIStatus.ERROR, value: undefined};
     }
 
     protected static encodeReadPropertiesFrame(propertyIds: string[]): string {
@@ -640,19 +645,19 @@ class SIAbstractGatewayClient {
         return frame;
     }
 
-    protected static decodePropertyWrittenFrame(frame: string): SIFrameContent {
+    protected static decodePropertyWrittenFrame(frame: string): SIPropertyWrittenWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY WRITTEN" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
             return {
                 status: statusFromString(decodedFrame.headers.get("status")),
-                id: decodedFrame.headers.get("id")
+                id: decodedFrame.headers.get("id")!
             };
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during property write");
         }
-        return {};
+        return {id: "", status: SIStatus.ERROR};
     }
 
     protected static encodeSubscribePropertyFrame(propertyId: string): string {
@@ -1459,12 +1464,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         }
                         break;
 
-                    case "PROPERTY WRITTEN":
-                        receivedMessage = SIGatewayClient.decodePropertyWrittenFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined) {
-                            this.siGatewayCallback.onPropertyWritten(receivedMessage.status, receivedMessage.id);
+                    case "PROPERTY WRITTEN": {
+                        const decoded = SIGatewayClient.decodePropertyWrittenFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onPropertyWritten(decoded.status, decoded.id);
                         }
                         break;
+                    }
 
                     case "PROPERTY SUBSCRIBED":
                         receivedMessage = SIGatewayClient.decodePropertySubscribedFrame(event.data);
@@ -1591,7 +1597,7 @@ type SIPropertyReadBTFrameContent = {
     value: boolean | number | string | null
 }
 
-type SIPropertyWrittenFrameContent = {
+type SIPropertyWrittenBTFrameContent = {
     status: SIStatus,
     id: string
 }
@@ -1755,7 +1761,7 @@ class SIAbstractBluetoothGatewayClient {
         );
     }
 
-    protected static decodePropertyWrittenFrame(frame: Uint8Array): SIPropertyWrittenFrameContent {
+    protected static decodePropertyWrittenFrame(frame: Uint8Array): SIPropertyWrittenBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x85 && decoded.sequence.length === 2 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "string") {
