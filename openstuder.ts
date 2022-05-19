@@ -231,6 +231,22 @@ export enum SIDeviceFunctions {
     ALL
 }
 
+function deviceFunctionsFromString(str?: string): Set<SIDeviceFunctions> {
+    if (str == null) return new Set([SIDeviceFunctions.ALL]);
+
+    let functions = new Set<SIDeviceFunctions>();
+    if (str.indexOf('all') >= 0) {
+        functions.add(SIDeviceFunctions.ALL);
+    } else {
+        if (str.indexOf('inverter') >= 0) functions.add(SIDeviceFunctions.INVERTER);
+        if (str.indexOf('charger') >= 0) functions.add(SIDeviceFunctions.CHARGER);
+        if (str.indexOf('solar') >= 0) functions.add(SIDeviceFunctions.SOLAR);
+        if (str.indexOf('transfer') >= 0) functions.add(SIDeviceFunctions.TRANSFER);
+        if (str.indexOf('battery') >= 0) functions.add(SIDeviceFunctions.BATTERY);
+    }
+    return functions;
+}
+
 /**
  * Class for reporting all OpenStuder protocol errors.
  */
@@ -336,6 +352,15 @@ type SIDescribeWSFrameContent = {
     status: SIStatus,
     id: string | undefined,
     description: string | undefined
+}
+
+type SIPropertiesFoundWSFrameContent = {
+    status: SIStatus,
+    id: string | undefined,
+    count: number,
+    virtual: boolean,
+    functions: Set<SIDeviceFunctions>
+    properties: Array<string> | undefined
 }
 
 // TODO: remove.
@@ -521,7 +546,7 @@ class SIAbstractGatewayClient {
         return frame;
     }
 
-    protected static decodePropertiesFoundFrame(frame: string): SIFrameContent {
+    protected static decodePropertiesFoundFrame(frame: string): SIPropertiesFoundWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTIES FOUND" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id") && decodedFrame.headers.has("count")) {
             const status = statusFromString(decodedFrame.headers.get("status"));
@@ -529,14 +554,16 @@ class SIAbstractGatewayClient {
                 status: status,
                 id: decodedFrame.headers.get("id"),
                 count: +(decodedFrame.headers.get("count") || 0),
-                properties: status === SIStatus.SUCCESS ? JSON.parse(decodedFrame.body) : undefined
+                virtual: decodedFrame.headers.get('virtual') === 'true',
+                functions: deviceFunctionsFromString(decodedFrame.headers.get('functions')),
+                properties: status === SIStatus.SUCCESS ? JSON.parse(decodedFrame.body) as Array<string> : undefined
             }
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during find properties");
         }
-        return {};
+        return {count: 0, functions: new Set([SIDeviceFunctions.ALL]), id: undefined, properties: undefined, status: SIStatus.ERROR, virtual: false};
     }
 
     protected static encodeReadPropertyFrame(propertyId: string): string {
@@ -896,9 +923,11 @@ export interface SIGatewayClientCallbacks {
      * @param status Status of the find operation.
      * @param id The searched ID (including wildcard character).
      * @param count The number of properties found.
+     * @param virtual True if list contains only virtual devices, false if it contains only real devices.
+     * @param functions Function list mask.
      * @param properties List of the property IDs
      */
-    onPropertiesFound(status: SIStatus, id: string, count: number, properties: string[]): void;
+    onPropertiesFound(status: SIStatus, id: string, count: number, virtual: boolean, functions: Set<SIDeviceFunctions>, properties: string[]): void;
 
     /**
      * Called when the property read operation started using read_property() has completed on the gateway.
@@ -1401,13 +1430,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         break;
                     }
 
-                    case "PROPERTIES FOUND":
-                        receivedMessage = SIGatewayClient.decodePropertiesFoundFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined && receivedMessage.count !== undefined &&
-                            receivedMessage.properties !== undefined) {
-                            this.siGatewayCallback.onPropertiesFound(receivedMessage.status, receivedMessage.id, receivedMessage.count, receivedMessage.properties);
+                    case "PROPERTIES FOUND": {
+                        const decoded = SIGatewayClient.decodePropertiesFoundFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onPropertiesFound(decoded.status, decoded.id || '', decoded.count, decoded.virtual, decoded.functions, decoded.properties || []);
                         }
                         break;
+                    }
 
                     case "PROPERTY READ":
                         receivedMessage = SIGatewayClient.decodePropertyReadFrame(event.data);
@@ -1549,7 +1578,7 @@ type SIDescribeBTFrameContent = {
     description: Map<string,string> | Array<string> | null
 }
 
-type SIPropertyReadFrameContent = {
+type SIPropertyReadBTFrameContent = {
     status: SIStatus,
     id: string,
     value: boolean | number | string | null
@@ -1694,7 +1723,7 @@ class SIAbstractBluetoothGatewayClient {
         );
     }
 
-    protected static decodePropertyReadFrame(frame: Uint8Array): SIPropertyReadFrameContent {
+    protected static decodePropertyReadFrame(frame: Uint8Array): SIPropertyReadBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x84 && decoded.sequence.length >= 2 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "string") {
