@@ -379,6 +379,11 @@ type SIPropertySubscribedWSFrameContent = {
     id: string
 }
 
+type SIPropertyUpdateWSFrameContent = {
+    id: string,
+    value: boolean | number | string | undefined
+}
+
 // TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
@@ -763,12 +768,11 @@ class SIAbstractGatewayClient {
         return result;
     }
 
-    protected static decodePropertyUpdateFrame(frame: string): SIFrameContent {
+    protected static decodePropertyUpdateFrame(frame: string): SIPropertyUpdateWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY UPDATE" && decodedFrame.headers.has("value") && decodedFrame.headers.has("id")) {
             return {
-                status: statusFromString(decodedFrame.headers.get("status")),
-                id: decodedFrame.headers.get("id"),
+                id: decodedFrame.headers.get("id")!,
                 value: decodedFrame.headers.get("value")
             };
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
@@ -776,7 +780,7 @@ class SIAbstractGatewayClient {
         } else {
             SIProtocolError.raise("unknown error receiving property update");
         }
-        return {};
+        return {id: "", value: undefined};
     }
 
     protected static encodeReadDatalogFrame(propertyId?: string, dateFrom?: Date, dateTo?: Date, limit?: number): string {
@@ -1506,12 +1510,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         }
                         break;
 
-                    case "PROPERTY UPDATE":
-                        receivedMessage = SIGatewayClient.decodePropertyUpdateFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.id !== undefined) {
-                            this.siGatewayCallback.onPropertyUpdated(receivedMessage.id, receivedMessage.value);
+                    case "PROPERTY UPDATE": {
+                        const decoded = SIGatewayClient.decodePropertyUpdateFrame(event.data);
+                        if (this.siGatewayCallback && decoded.id !== '') {
+                            this.siGatewayCallback.onPropertyUpdated(decoded.id, decoded.value);
                         }
                         break;
+                    }
 
                     case "DATALOG READ":
                         receivedMessage = SIGatewayClient.decodeDatalogReadFrame(event.data);
@@ -1613,7 +1618,7 @@ type SIPropertySubscribedBTFrameContent = {
     id: string
 }
 
-type SIPropertyUpdateFrameContent = {
+type SIPropertyUpdateBTFrameContent = {
     id: string,
     value: boolean | number | string | null
 }
@@ -1827,7 +1832,7 @@ class SIAbstractBluetoothGatewayClient {
         }
     }
 
-    protected static decodePropertyUpdateFrame(frame: Uint8Array): SIPropertyUpdateFrameContent {
+    protected static decodePropertyUpdateFrame(frame: Uint8Array): SIPropertyUpdateBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0xFE && decoded.sequence.length === 2 &&
             typeof decoded.sequence[0] === "string") {
