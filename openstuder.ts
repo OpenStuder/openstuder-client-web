@@ -315,6 +315,24 @@ export type SISubscriptionsResult = {
  * WebSocket client implementation.
  */
 
+type SIDecodedWebSocketFrame = {
+    command: string,
+    body: string,
+    headers: Map<string, string>
+}
+
+type SIAuthorizedWSFrameContent = {
+    accessLevel: SIAccessLevel,
+    protocolVersion: string,
+    gatewayVersion: string
+}
+
+type SIEnumeratedWSFrameContent = {
+    status: SIStatus,
+    deviceCount: number
+}
+
+// TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
     gatewayVersion?: string,
@@ -327,12 +345,6 @@ type SIFrameContent = {
 
     properties?: string[]
     messages?: SIDeviceMessage[]
-}
-
-type SIDecodedWebSocketFrame = {
-    command: string,
-    body: string,
-    headers: Map<string, string>
 }
 
 class SIAbstractGatewayClient {
@@ -389,13 +401,14 @@ class SIAbstractGatewayClient {
         }
     }
 
-    protected static decodeAuthorizedFrame(frame: string): SIFrameContent {
+    protected static decodeAuthorizedFrame(frame: string): SIAuthorizedWSFrameContent {
         const decodedFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "AUTHORIZED" && decodedFrame.headers.has("access_level") && decodedFrame.headers.has("protocol_version")) {
             if (decodedFrame.headers.get("protocol_version") === "1") {
                 return {
-                    accessLevel: decodedFrame.headers.get("access_level"),
-                    gatewayVersion: decodedFrame.headers.get("gateway_version")
+                    accessLevel: accessLevelFromString(decodedFrame.headers.get("access_level")!),
+                    protocolVersion: decodedFrame.headers.get("protocol_version")!,
+                    gatewayVersion: decodedFrame.headers.get("gateway_version")!
                 };
             } else {
                 SIProtocolError.raise("protocol version 1 not supported by server");
@@ -405,19 +418,19 @@ class SIAbstractGatewayClient {
         } else {
             SIProtocolError.raise("unknown error during authorization");
         }
-        return {}
+        return {accessLevel: SIAccessLevel.NONE, gatewayVersion: "", protocolVersion: ""}
     }
 
     protected static encodeEnumerateFrame(): string {
         return "ENUMERATE\n\n";
     }
 
-    protected static decodeEnumerateFrame(frame: string): SIFrameContent {
+    protected static decodeEnumerateFrame(frame: string): SIEnumeratedWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "ENUMERATED") {
             return {
                 status: statusFromString(decodedFrame.headers.get("status")),
-                count: +(decodedFrame.headers.get("device_count") || 0)
+                deviceCount: +(decodedFrame.headers.get("device_count") || 0)
             };
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
@@ -1339,23 +1352,19 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         let command: string = SIGatewayClient.peekFrameCommand(event.data);
 
         try {
-            let receivedMessage: SIFrameContent;
+            let receivedMessage: SIFrameContent; // TODO: Remove
 
             // In AUTHORIZE state, we only handle AUTHORIZED messages
             if (this.state === SIConnectionState.AUTHORIZING) {
-                receivedMessage = SIGatewayClient.decodeAuthorizedFrame(event.data);
-                if (receivedMessage.accessLevel) {
-                    this.accessLevel = accessLevelFromString(receivedMessage.accessLevel);
-                }
-                if (receivedMessage.gatewayVersion) {
-                    this.gatewayVersion = receivedMessage.gatewayVersion;
-                }
+                const decoded = SIGatewayClient.decodeAuthorizedFrame(event.data);
+                this.accessLevel = decoded.accessLevel;
+                this.gatewayVersion = decoded.gatewayVersion;
 
                 // Change state to CONNECTED.
                 this.state = SIConnectionState.CONNECTED;
 
                 // Call callback if present.
-                if (this.siGatewayCallback && receivedMessage.accessLevel && receivedMessage.gatewayVersion) {
+                if (this.siGatewayCallback) {
                     this.siGatewayCallback.onConnected(this.accessLevel, this.gatewayVersion);
                 }
             }
@@ -1370,9 +1379,9 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         break;
 
                     case "ENUMERATED":
-                        receivedMessage = SIGatewayClient.decodeEnumerateFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.count !== undefined) {
-                            this.siGatewayCallback.onEnumerated(receivedMessage.status, receivedMessage.count);
+                        const decoded = SIGatewayClient.decodeEnumerateFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onEnumerated(decoded.status, decoded.deviceCount);
                         }
                         break;
 
@@ -1514,13 +1523,13 @@ type SIDecodedBluetoothFrame = {
     sequence: Array<any>
 }
 
-type SIAuthorizedFrameContent = {
+type SIAuthorizedBTFrameContent = {
     accessLevel: SIAccessLevel,
     protocolVersion: number,
     gatewayVersion: string
 }
 
-type SIEnumeratedFrameContent = {
+type SIEnumeratedBTFrameContent = {
     status: SIStatus,
     deviceCount: number
 }
@@ -1597,7 +1606,7 @@ class SIAbstractBluetoothGatewayClient {
         );
     }
 
-    protected static decodeAuthorizedFrame(frame: Uint8Array): SIAuthorizedFrameContent {
+    protected static decodeAuthorizedFrame(frame: Uint8Array): SIAuthorizedBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x81 && decoded.sequence.length === 3 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "number" &&
@@ -1624,7 +1633,7 @@ class SIAbstractBluetoothGatewayClient {
         );
     }
 
-    protected static decodeEnumerateFrame(frame: Uint8Array): SIEnumeratedFrameContent {
+    protected static decodeEnumerateFrame(frame: Uint8Array): SIEnumeratedBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x82 && decoded.sequence.length === 2 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "number") {
