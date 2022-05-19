@@ -384,6 +384,11 @@ type SIPropertyUpdateWSFrameContent = {
     value: boolean | number | string | undefined
 }
 
+type SIPropertyUnsubscribedWSFrameContent = {
+    status: SIStatus,
+    id: string
+}
+
 // TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
@@ -723,19 +728,19 @@ class SIAbstractGatewayClient {
         return "UNSUBSCRIBE PROPERTY\nid:" + propertyId + "\n\n";
     }
 
-    protected static decodePropertyUnsubscribedFrame(frame: string): SIFrameContent {
+    protected static decodePropertyUnsubscribedFrame(frame: string): SIPropertyUnsubscribedWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "PROPERTY UNSUBSCRIBED" && decodedFrame.headers.has("status") && decodedFrame.headers.has("id")) {
             return {
                 status: statusFromString(decodedFrame.headers.get("status")),
-                id: decodedFrame.headers.get("id")
+                id: decodedFrame.headers.get("id")!
             }
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during property unsubscribe");
         }
-        return {};
+        return {id: "", status: SIStatus.ERROR};
     }
 
     protected static encodeUnsubscribePropertiesFrame(propertyIds: string[]): string {
@@ -1496,12 +1501,13 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         }
                         break;
 
-                    case "PROPERTY UNSUBSCRIBED":
-                        receivedMessage = SIGatewayClient.decodePropertyUnsubscribedFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.id !== undefined) {
-                            this.siGatewayCallback.onPropertyUnsubscribed(receivedMessage.status, receivedMessage.id);
+                    case "PROPERTY UNSUBSCRIBED": {
+                        const decoded = SIGatewayClient.decodePropertyUnsubscribedFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onPropertyUnsubscribed(decoded.status, decoded.id);
                         }
                         break;
+                    }
 
                     case "PROPERTIES UNSUBSCRIBED":
                         let receivedUnsubscriptionResult: SISubscriptionsResult[] = SIGatewayClient.decodePropertiesUnsubscribedFrame(event.data);
@@ -1623,12 +1629,12 @@ type SIPropertyUpdateBTFrameContent = {
     value: boolean | number | string | null
 }
 
-type SIPropertyUnsubscribedFrameContent = {
+type SIPropertyUnsubscribedBTFrameContent = {
     status: SIStatus,
     id: string
 }
 
-type SIDataLogReadFrameContent = {
+type SIDataLogReadBTFrameContent = {
     status: SIStatus,
     id: string | null,
     count: number,
@@ -1816,7 +1822,7 @@ class SIAbstractBluetoothGatewayClient {
         );
     }
 
-    protected static decodePropertyUnsubscribedFrame(frame: Uint8Array): SIPropertyUnsubscribedFrameContent {
+    protected static decodePropertyUnsubscribedFrame(frame: Uint8Array): SIPropertyUnsubscribedBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x87 && decoded.sequence.length === 2 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "string") {
@@ -1857,7 +1863,7 @@ class SIAbstractBluetoothGatewayClient {
         )
     }
 
-    protected static decodeDatalogReadFrame(frame: Uint8Array): SIDataLogReadFrameContent {
+    protected static decodeDatalogReadFrame(frame: Uint8Array): SIDataLogReadBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x88 && decoded.sequence.length === 4 &&
             typeof decoded.sequence[0] === "number" && (typeof decoded.sequence[1] === "string" || decoded.sequence[1] == null) &&
