@@ -332,6 +332,12 @@ type SIEnumeratedWSFrameContent = {
     deviceCount: number
 }
 
+type SIDescribeWSFrameContent = {
+    status: SIStatus,
+    id: string | undefined,
+    description: string | undefined
+}
+
 // TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
@@ -437,7 +443,7 @@ class SIAbstractGatewayClient {
         } else {
             SIProtocolError.raise("unknown error during property read");
         }
-        return {};
+        return {deviceCount: 0, status: SIStatus.ERROR};
     }
 
     protected static encodeDescribeFrame(deviceAccessId?: string, deviceId?: string, propertyId?: number, flags?: SIDescriptionFlags[]): string {
@@ -476,21 +482,21 @@ class SIAbstractGatewayClient {
         return frame;
     }
 
-    protected static decodeDescriptionFrame(frame: string): SIFrameContent {
+    protected static decodeDescriptionFrame(frame: string): SIDescribeWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "DESCRIPTION" && decodedFrame.headers.has("status")) {
             const status = statusFromString(decodedFrame.headers.get("status"));
             return {
                 status: status,
                 id: decodedFrame.headers.get("id"),
-                body: status === SIStatus.SUCCESS ? decodedFrame.body : undefined
+                description: status === SIStatus.SUCCESS ? decodedFrame.body : undefined
             };
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error during description");
         }
-        return {};
+        return {description: undefined, id: undefined, status: SIStatus.ERROR};
     }
 
     protected static encodeFindPropertiesFrame(propertyId: string, virtual?: boolean, functionMask?: Array<SIDeviceFunctions>) {
@@ -1378,19 +1384,22 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         }
                         break;
 
-                    case "ENUMERATED":
+                    case "ENUMERATED": {
                         const decoded = SIGatewayClient.decodeEnumerateFrame(event.data);
                         if (this.siGatewayCallback) {
                             this.siGatewayCallback.onEnumerated(decoded.status, decoded.deviceCount);
                         }
                         break;
+                    }
 
-                    case "DESCRIPTION":
-                        receivedMessage = SIGatewayClient.decodeDescriptionFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.body !== undefined) {
-                            this.siGatewayCallback.onDescription(receivedMessage.status, receivedMessage.body, receivedMessage.id);
+
+                    case "DESCRIPTION": {
+                        const decoded = SIGatewayClient.decodeDescriptionFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            this.siGatewayCallback.onDescription(decoded.status, decoded.description || '', decoded.id);
                         }
                         break;
+                    }
 
                     case "PROPERTIES FOUND":
                         receivedMessage = SIGatewayClient.decodePropertiesFoundFrame(event.data);
@@ -1534,7 +1543,7 @@ type SIEnumeratedBTFrameContent = {
     deviceCount: number
 }
 
-type SIDescribeFrameContent = {
+type SIDescribeBTFrameContent = {
     status: SIStatus,
     id: string | undefined,
     description: Map<string,string> | Array<string> | null
@@ -1662,7 +1671,7 @@ class SIAbstractBluetoothGatewayClient {
         return this.join(CBOR_encode(0x03), CBOR_encode(id))
     }
 
-    protected static decodeDescriptionFrame(frame: Uint8Array): SIDescribeFrameContent {
+    protected static decodeDescriptionFrame(frame: Uint8Array): SIDescribeBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x83 && decoded.sequence.length === 3 &&
             typeof decoded.sequence[0] === "number" && (decoded.sequence[1] == null || typeof decoded.sequence[1] === "string")) {
