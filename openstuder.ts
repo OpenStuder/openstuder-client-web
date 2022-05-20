@@ -1066,7 +1066,9 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
     private user?: string;
     private password?: string;
 
-    private siGatewayCallback: SIGatewayClientCallbacks | undefined;
+    private callbacks: SIGatewayClientCallbacks | undefined;
+
+    private debug: boolean = false;
 
     public constructor() {
         super();
@@ -1079,13 +1081,23 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.password = undefined;
     }
 
+    public setDebugEnabled(enabled: boolean) {
+        if (this.debug != enabled) {
+            if (enabled)
+                console.info("Debug enabled.");
+            else
+                console.info("Debug disabled.");
+        }
+        this.debug = enabled;
+    }
+
     /**
      * Configures the client to use the callbacks of the passed object.
      *
      * @param siGatewayCallback Object implementing the SIGatewayClientCallbacks interface to be used for all callbacks.
      */
     public setCallback(siGatewayCallback: SIGatewayClientCallbacks | undefined) {
-        this.siGatewayCallback = siGatewayCallback;
+        this.callbacks = siGatewayCallback;
     }
 
     /**
@@ -1100,6 +1112,10 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
      * @param connectionTimeout Connection timeout in milliseconds, defaults to 5000 if not provided.
      */
     public connect(host: string, port: number = 1987, user?: string, password?: string, connectionTimeout: number = 5000) {
+        if (this.debug) {
+            console.debug(`Connecting to ${host}:${port}, user=${user || '(none)'}, password=${password || '(none)'}, connectionTimeout=${connectionTimeout}.`);
+        }
+
         // Ensure that the client is in the DISCONNECTED state.
         this.ensureInState(SIConnectionState.DISCONNECTED);
 
@@ -1154,7 +1170,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send ENUMERATE message to gateway.
-        this.ws?.send(SIGatewayClient.encodeEnumerateFrame());
+        this.send(SIGatewayClient.encodeEnumerateFrame());
     }
 
     /**
@@ -1176,7 +1192,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send DESCRIBE message to gateway.
-        this.ws?.send(SIGatewayClient.encodeDescribeFrame(deviceAccessId, deviceId, propertyId, flags));
+        this.send(SIGatewayClient.encodeDescribeFrame(deviceAccessId, deviceId, propertyId, flags));
     }
 
     /**
@@ -1197,7 +1213,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send FIND PROPERTIES message to gateway.
-        this.ws?.send(SIGatewayClient.encodeFindPropertiesFrame(propertyId, virtual, functionMask));
+        this.send(SIGatewayClient.encodeFindPropertiesFrame(propertyId, virtual, functionMask));
     }
 
     /**
@@ -1212,7 +1228,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send READ PROPERTY message to gateway.
-        this.ws?.send(SIGatewayClient.encodeReadPropertyFrame(propertyId));
+        this.send(SIGatewayClient.encodeReadPropertyFrame(propertyId));
     }
 
     /**
@@ -1227,7 +1243,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send READ PROPERTIES message to gateway.
-        this.ws?.send(SIGatewayClient.encodeReadPropertiesFrame(propertyIds));
+        this.send(SIGatewayClient.encodeReadPropertiesFrame(propertyIds));
     }
 
     /**
@@ -1249,7 +1265,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send WRITE PROPERTY message to gateway.
-        this.ws?.send(SIGatewayClient.encodeWritePropertyFrame(propertyId, value, flags));
+        this.send(SIGatewayClient.encodeWritePropertyFrame(propertyId, value, flags));
     }
 
     /**
@@ -1265,7 +1281,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send SUBSCRIBE PROPERTY message to gateway.
-        this.ws?.send(SIGatewayClient.encodeSubscribePropertyFrame(propertyId));
+        this.send(SIGatewayClient.encodeSubscribePropertyFrame(propertyId));
     }
 
     /**
@@ -1281,7 +1297,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send SUBSCRIBE PROPERTIES message to gateway.
-        this.ws?.send(SIGatewayClient.encodeSubscribePropertiesFrame(propertyIds));
+        this.send(SIGatewayClient.encodeSubscribePropertiesFrame(propertyIds));
 
     }
 
@@ -1298,7 +1314,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send UNSUBSCRIBE PROPERTY message to gateway.
-        this.ws?.send(SIGatewayClient.encodeUnsubscribePropertyFrame(propertyId));
+        this.send(SIGatewayClient.encodeUnsubscribePropertyFrame(propertyId));
     }
 
     /**
@@ -1314,7 +1330,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send UNSUBSCRIBE PROPERTY message to gateway.
-        this.ws?.send(SIGatewayClient.encodeUnsubscribePropertiesFrame(propertyId));
+        this.send(SIGatewayClient.encodeUnsubscribePropertiesFrame(propertyId));
     }
 
     /**
@@ -1332,7 +1348,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send READ DATALOG message to gateway.
-        this.ws?.send(SIGatewayClient.encodeReadDatalogFrame(undefined, dateFrom, dateTo, undefined))
+        this.send(SIGatewayClient.encodeReadDatalogFrame(undefined, dateFrom, dateTo, undefined))
     }
 
     /**
@@ -1351,7 +1367,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send READ DATALOG message to gateway.
-        this.ws?.send(SIGatewayClient.encodeReadDatalogFrame(propertyId, dateFrom, dateTo, limit));
+        this.send(SIGatewayClient.encodeReadDatalogFrame(propertyId, dateFrom, dateTo, limit));
     }
 
     /**
@@ -1369,7 +1385,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ensureInState(SIConnectionState.CONNECTED);
 
         // Encode and send READ MESSAGES message to gateway.
-        this.ws?.send(SIGatewayClient.encodeReadMessagesFrame(dateFrom, dateTo, limit));
+        this.send(SIGatewayClient.encodeReadMessagesFrame(dateFrom, dateTo, limit));
     }
 
     /**
@@ -1379,24 +1395,48 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         // Ensure that the client is in the CONNECTED state.
         this.ensureInState(SIConnectionState.CONNECTED);
 
+        if (this.debug) {
+            console.debug("Closing WebSocket connection.");
+        }
+
         // Close the WebSocket.
         this.ws?.close();
     }
 
     private ensureInState(state: SIConnectionState) {
         if (state !== this.state) {
+            if (this.debug) {
+                console.error(`Invalid client state! required=${state}, effective=${this.state}`);
+            }
+
             throw new SIProtocolError("invalid client state");
         }
     }
 
+    private send(frame: string) {
+        if (this.debug) {
+            console.debug("WebSocket TX:\n\n" + frame);
+        }
+
+        this.ws?.send(frame);
+    }
+
     private onConnectTimeout = () => {
         if (this.state === SIConnectionState.CONNECTING) {
+            if (this.debug) {
+                console.error(`WebSocket connection timeout!`);
+            }
+
             this.ws?.close();
-            this.siGatewayCallback?.onError("connect timeout");
+            this.callbacks?.onError("connect timeout");
         }
     };
 
     private onOpen = () => {
+        if (this.debug) {
+            console.error(`WebSocket connection established.`);
+        }
+
         clearTimeout(this.connectionTimeout);
         this.state = SIConnectionState.AUTHORIZING;
         let frame = SIGatewayClient.encodeAuthorizeFrame(this.user, this.password);
@@ -1406,12 +1446,14 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
     };
 
     private onMessage = (event: MessageEvent) => {
+        if (this.debug) {
+            console.debug("WebSocket RX:\n\n" + event.data);
+        }
+
         // Determine the actual command.
         let command: string = SIGatewayClient.peekFrameCommand(event.data);
 
         try {
-            let receivedMessage: SIFrameContent; // TODO: Remove
-
             // In AUTHORIZE state, we only handle AUTHORIZED messages
             if (this.state === SIConnectionState.AUTHORIZING) {
                 const decoded = SIGatewayClient.decodeAuthorizedFrame(event.data);
@@ -1422,24 +1464,29 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                 this.state = SIConnectionState.CONNECTED;
 
                 // Call callback if present.
-                if (this.siGatewayCallback) {
-                    this.siGatewayCallback.onConnected(this.accessLevel, this.gatewayVersion);
+                if (this.callbacks) {
+                    this.callbacks.onConnected(this.accessLevel, this.gatewayVersion);
                 }
             }
 
             // In CONNECTED state we handle all messages except the AUTHORIZED message.
             else if (this.state === SIConnectionState.CONNECTED) {
                 switch (command) {
-                    case "ERROR":
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onError(SIGatewayClient.decodeFrame(event.data).headers.get("reason") || '')
+                    case "ERROR": {
+                        const reason = SIGatewayClient.decodeFrame(event.data).headers.get("reason") || 'unknown reason';
+                        if (this.debug) {
+                            console.error(`WebSocket error: ${reason}`);
+                        }
+                        if (this.callbacks) {
+                            this.callbacks.onError(reason);
                         }
                         break;
+                    }
 
                     case "ENUMERATED": {
                         const decoded = SIGatewayClient.decodeEnumerateFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onEnumerated(decoded.status, decoded.deviceCount);
+                        if (this.callbacks) {
+                            this.callbacks.onEnumerated(decoded.status, decoded.deviceCount);
                         }
                         break;
                     }
@@ -1447,89 +1494,89 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
 
                     case "DESCRIPTION": {
                         const decoded = SIGatewayClient.decodeDescriptionFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onDescription(decoded.status, decoded.description || '', decoded.id);
+                        if (this.callbacks) {
+                            this.callbacks.onDescription(decoded.status, decoded.description || '', decoded.id);
                         }
                         break;
                     }
 
                     case "PROPERTIES FOUND": {
                         const decoded = SIGatewayClient.decodePropertiesFoundFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertiesFound(decoded.status, decoded.id || '', decoded.count, decoded.virtual, decoded.functions, decoded.properties || []);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertiesFound(decoded.status, decoded.id || '', decoded.count, decoded.virtual, decoded.functions, decoded.properties || []);
                         }
                         break;
                     }
 
                     case "PROPERTY READ": {
                         const decoded = SIGatewayClient.decodePropertyReadFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertyRead(decoded.status, decoded.id, decoded.value);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertyRead(decoded.status, decoded.id, decoded.value);
                         }
                         break;
                     }
 
                     case "PROPERTIES READ":
                         let receivedPropertyResult = SIGatewayClient.decodePropertiesReadFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertiesRead(receivedPropertyResult);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertiesRead(receivedPropertyResult);
                         }
                         break;
 
                     case "PROPERTY WRITTEN": {
                         const decoded = SIGatewayClient.decodePropertyWrittenFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertyWritten(decoded.status, decoded.id);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertyWritten(decoded.status, decoded.id);
                         }
                         break;
                     }
 
                     case "PROPERTY SUBSCRIBED": {
                         const decoded = SIGatewayClient.decodePropertySubscribedFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertySubscribed(decoded.status, decoded.id);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertySubscribed(decoded.status, decoded.id);
                         }
                         break;
                     }
 
                     case "PROPERTIES SUBSCRIBED":
                         let receivedSubscriptionResult: SISubscriptionsResult[] = SIGatewayClient.decodePropertiesSubscribedFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertiesSubscribed(receivedSubscriptionResult);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertiesSubscribed(receivedSubscriptionResult);
                         }
                         break;
 
                     case "PROPERTY UNSUBSCRIBED": {
                         const decoded = SIGatewayClient.decodePropertyUnsubscribedFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertyUnsubscribed(decoded.status, decoded.id);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertyUnsubscribed(decoded.status, decoded.id);
                         }
                         break;
                     }
 
                     case "PROPERTIES UNSUBSCRIBED":
                         let receivedUnsubscriptionResult: SISubscriptionsResult[] = SIGatewayClient.decodePropertiesUnsubscribedFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onPropertiesUnsubscribed(receivedUnsubscriptionResult);
+                        if (this.callbacks) {
+                            this.callbacks.onPropertiesUnsubscribed(receivedUnsubscriptionResult);
                         }
                         break;
 
                     case "PROPERTY UPDATE": {
                         const decoded = SIGatewayClient.decodePropertyUpdateFrame(event.data);
-                        if (this.siGatewayCallback && decoded.id !== '') {
-                            this.siGatewayCallback.onPropertyUpdated(decoded.id, decoded.value);
+                        if (this.callbacks && decoded.id !== '') {
+                            this.callbacks.onPropertyUpdated(decoded.id, decoded.value);
                         }
                         break;
                     }
 
                     case "DATALOG READ": {
                         const decoded = SIGatewayClient.decodeDatalogReadFrame(event.data);
-                        if (this.siGatewayCallback) {
+                        if (this.callbacks) {
                             if (decoded.id) {
-                                this.siGatewayCallback.onDatalogRead(decoded.status, decoded.id, decoded.count, decoded.results);
+                                this.callbacks.onDatalogRead(decoded.status, decoded.id, decoded.count, decoded.results);
                             } else {
                                 let properties = decoded.results.split("\n");
-                                this.siGatewayCallback.onDatalogPropertiesRead(decoded.status, properties);
+                                this.callbacks.onDatalogPropertiesRead(decoded.status, properties);
                             }
                         }
                         break;
@@ -1537,16 +1584,16 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
 
                     case "DEVICE MESSAGE": {
                         const decoded = SIGatewayClient.decodeDeviceMessageFrame(event.data);
-                        if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onDeviceMessage(decoded);
+                        if (this.callbacks) {
+                            this.callbacks.onDeviceMessage(decoded);
                         }
                         break;
                     }
 
                     case "MESSAGES READ": {
                         const decoded = SIGatewayClient.decodeMessagesReadFrame(event.data);
-                        if (this.siGatewayCallback && decoded.status !== undefined && decoded.count !== undefined && decoded.messages !== undefined) {
-                            this.siGatewayCallback.onMessageRead(decoded.status, decoded.count, decoded.messages);
+                        if (this.callbacks && decoded.status !== undefined && decoded.count !== undefined && decoded.messages !== undefined) {
+                            this.callbacks.onMessageRead(decoded.status, decoded.count, decoded.messages);
                         }
                         break;
                     }
@@ -1557,9 +1604,16 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
             }
         } catch (error) {
             if (error instanceof SIProtocolError) {
-                this.siGatewayCallback?.onError(error.message);
+                if (this.debug) {
+                    console.error(`Protocol error: ${error.message}`);
+                }
+
+                this.callbacks?.onError(error.message);
             }
             if (this.state === SIConnectionState.AUTHORIZING) {
+                if (this.debug) {
+                    console.error(`Authorizing failed, closing connection.`);
+                }
                 this.ws?.close();
                 this.state = SIConnectionState.DISCONNECTED;
             }
@@ -1567,10 +1621,18 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
     };
 
     private onError = (event: Event) => {
-        this.siGatewayCallback?.onError('' + event);
+        if (this.debug) {
+            console.error(`Websocket error: ${'' + event}`);
+        }
+
+        this.callbacks?.onError('' + event);
     };
 
     private onClose = () => {
+        if (this.debug) {
+            console.debug(`WebSocket connection closed.`);
+        }
+
         // Change state to DISCONNECTED.
         this.state = SIConnectionState.DISCONNECTED;
 
@@ -1578,7 +1640,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.accessLevel = SIAccessLevel.NONE;
 
         // Call callback.
-        this.siGatewayCallback?.onDisconnected();
+        this.callbacks?.onDisconnected();
     };
 }
 
@@ -2374,6 +2436,7 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
 
             if (this.state === SIConnectionState.AUTHORIZING) {
                 if (command !== 0x81) {
+                    // noinspection ExceptionCaughtLocallyJS
                     throw new SIProtocolError("Authorization failed");
                 }
                 const result = SIBluetoothGatewayClient.decodeAuthorizedFrame(frame);
