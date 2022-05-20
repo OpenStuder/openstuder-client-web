@@ -389,6 +389,13 @@ type SIPropertyUnsubscribedWSFrameContent = {
     id: string
 }
 
+type SIDataLogReadWSFrameContent = {
+    status: SIStatus,
+    id: string | undefined,
+    count: number,
+    results: string
+}
+
 // TODO: remove.
 type SIFrameContent = {
     accessLevel?: string,
@@ -802,21 +809,21 @@ class SIAbstractGatewayClient {
         return frame;
     }
 
-    protected static decodeDatalogReadFrame(frame: string): SIFrameContent {
+    protected static decodeDatalogReadFrame(frame: string): SIDataLogReadWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "DATALOG READ" && decodedFrame.headers.has("status") && decodedFrame.headers.has("count")) {
             return {
                 status: statusFromString(decodedFrame.headers.get("status")),
                 id: decodedFrame.headers.get("id"),
                 count: +(decodedFrame.headers.get("count") || 0),
-                body: decodedFrame.body
+                results: decodedFrame.body
             };
         } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
             SIProtocolError.raise(decodedFrame.headers.get("reason")!);
         } else {
             SIProtocolError.raise("unknown error receiving datalog read");
         }
-        return {};
+        return {count: 0, id: "", results: "", status: SIStatus.ERROR};
     }
 
     protected static encodeReadMessagesFrame(dateFrom?: Date, dateTo?: Date, limit?: number): string {
@@ -1524,17 +1531,18 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         break;
                     }
 
-                    case "DATALOG READ":
-                        receivedMessage = SIGatewayClient.decodeDatalogReadFrame(event.data);
-                        if (this.siGatewayCallback && receivedMessage.status !== undefined && receivedMessage.body !== undefined && receivedMessage.count !== undefined) {
-                            if (receivedMessage.id) {
-                                this.siGatewayCallback.onDatalogRead(receivedMessage.status, receivedMessage.id, receivedMessage.count, receivedMessage.body);
+                    case "DATALOG READ": {
+                        const decoded = SIGatewayClient.decodeDatalogReadFrame(event.data);
+                        if (this.siGatewayCallback) {
+                            if (decoded.id) {
+                                this.siGatewayCallback.onDatalogRead(decoded.status, decoded.id, decoded.count, decoded.results);
                             } else {
-                                let properties = receivedMessage.body.split("\n");
-                                this.siGatewayCallback.onDatalogPropertiesRead(receivedMessage.status, properties);
+                                let properties = decoded.results.split("\n");
+                                this.siGatewayCallback.onDatalogPropertiesRead(decoded.status, properties);
                             }
                         }
                         break;
+                    }
 
                     case "DEVICE MESSAGE":
                         const message = SIGatewayClient.decodeDeviceMessageFrame(event.data);
