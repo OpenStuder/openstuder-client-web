@@ -1112,12 +1112,12 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
      * @param connectionTimeout Connection timeout in milliseconds, defaults to 5000 if not provided.
      */
     public connect(host: string, port: number = 1987, user?: string, password?: string, connectionTimeout: number = 5000) {
+        // Ensure that the client is in the DISCONNECTED state.
+        this.ensureInState(SIConnectionState.DISCONNECTED);
+
         if (this.debug) {
             console.debug(`Connecting to ${host}:${port}, user=${user || '(none)'}, password=${password || '(none)'}, connectionTimeout=${connectionTimeout}.`);
         }
-
-        // Ensure that the client is in the DISCONNECTED state.
-        this.ensureInState(SIConnectionState.DISCONNECTED);
 
         // Save parameter for later use.
         this.user = user || "";
@@ -1434,7 +1434,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
 
     private onOpen = () => {
         if (this.debug) {
-            console.error(`WebSocket connection established.`);
+            console.debug(`WebSocket connection established.`);
         }
 
         clearTimeout(this.connectionTimeout);
@@ -1475,7 +1475,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                     case "ERROR": {
                         const reason = SIGatewayClient.decodeFrame(event.data).headers.get("reason") || 'unknown reason';
                         if (this.debug) {
-                            console.error(`WebSocket error: ${reason}`);
+                            console.error(`Protocol error: ${reason}`);
                         }
                         if (this.callbacks) {
                             this.callbacks.onError(reason);
@@ -1602,13 +1602,19 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         SIProtocolError.raise("unsupported frame command :" + command);
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof SIProtocolError) {
                 if (this.debug) {
                     console.error(`Protocol error: ${error.message}`);
                 }
 
                 this.callbacks?.onError(error.message);
+            } else {
+                if (this.debug) {
+                    console.error(`Error: ${error.toString()}`);
+                }
+
+                this.callbacks?.onError(error.toString());
             }
             if (this.state === SIConnectionState.AUTHORIZING) {
                 if (this.debug) {
@@ -2166,6 +2172,8 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
 
     private callbacks: SIBluetoothGatewayClientCallbacks | undefined;
 
+    private debug: boolean = false;
+
     public constructor() {
         super();
         this.state = SIConnectionState.DISCONNECTED;
@@ -2175,6 +2183,16 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
         this.frame = new Uint8Array(0);
         this.accessLevel = SIAccessLevel.NONE;
         this.gatewayVersion = '';
+    }
+
+    public setDebugEnabled(enabled: boolean) {
+        if (this.debug != enabled) {
+            if (enabled)
+                console.info("Debug enabled.");
+            else
+                console.info("Debug disabled.");
+        }
+        this.debug = enabled;
     }
 
     /**
@@ -2197,6 +2215,10 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
     public connect(user?: string, password?: string) {
         this.ensureInState(SIConnectionState.DISCONNECTED);
 
+        if (this.debug) {
+            console.debug(`Connecting to Bluetooth device, user=${user || '(none)'}, password=${password}`);
+        }
+
         navigator.bluetooth.requestDevice({filters: [{services: ["f3c2d800-8421-44b1-9655-0951992f313b"]}]}).then(device => {
             this.state = SIConnectionState.CONNECTING;
             this.device = device;
@@ -2215,9 +2237,17 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
             rx.addEventListener('characteristicvaluechanged', this.onCharacteristicChanged);
             return rx.startNotifications();
         }).then(_ => {
+            if (this.debug) {
+                console.debug(`Bluetooth connection established.`);
+            }
+
             this.state = SIConnectionState.AUTHORIZING;
             this.txSend(SIBluetoothGatewayClient.encodeAuthorizeFrame(user, password));
         }).catch(error => {
+            if (this.debug) {
+                console.error(`Bluetooth error: ${error}`);
+            }
+
             this.callbacks?.onError(error);
             this.onDeviceDisconnected();
         });
@@ -2411,10 +2441,18 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
      * Disconnects the client from the gateway.
      */
     public disconnect = () => {
+        if (this.debug) {
+            console.debug("Closing Bluetooth connection.");
+        }
+
         this.device!.gatt!.disconnect();
     }
 
     private onDeviceDisconnected = () => {
+        if (this.debug) {
+            console.debug(`Bluetooth connection closed.`);
+        }
+
         this.state = SIConnectionState.DISCONNECTED;
         this.device = null;
         this.service = null;
@@ -2424,12 +2462,21 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
 
     private onCharacteristicChanged = (event: Event) => {
         let fragment = new Uint8Array((event.target as BluetoothRemoteGATTCharacteristic).value!.buffer);
+
+        if (this.debug) {
+            console.debug("Bluetooth RX:\n\n" + fragment);
+        }
+
         let remainingFragments = fragment[0];
         this.frame = SIBluetoothGatewayClient.join(this.frame, fragment.subarray(1));
         if (remainingFragments !== 0) return;
 
         let frame = this.frame;
         this.frame = new Uint8Array(0);
+
+        if (this.debug) {
+            console.debug("Bluetooth frame complete:\n\n" + frame);
+        }
 
         try {
             const command = SIBluetoothGatewayClient.peekFrameCommand(frame);
@@ -2449,7 +2496,11 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
                 switch (command) {
                     case 0xFF: {
                         const decoded = SIBluetoothGatewayClient.decodeFrame(frame);
-                        this.callbacks?.onError(decoded.sequence.length > 0 ? decoded.sequence[0] : "unknown error");
+                        const reason = decoded.sequence.length > 0 ? decoded.sequence[0] : "unknown error";
+                        if (this.debug) {
+                            console.error(`Protocol error: ${reason}`);
+                        }
+                        this.callbacks?.onError(reason);
                         break;
                     }
 
@@ -2527,17 +2578,33 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
             }
         } catch (error: any) {
             if (error instanceof SIProtocolError) {
+                if (this.debug) {
+                    console.error(`Protocol error: ${error.message}`);
+                }
+
                 this.callbacks?.onError(error.message);
             } else {
-                this.callbacks?.onError(error.toString())
+                if (this.debug) {
+                    console.error(`Error: ${error.toString()}`);
+                }
+
+                this.callbacks?.onError(error.toString());
             }
             if (this.state === SIConnectionState.AUTHORIZING) {
+                if (this.debug) {
+                    console.error(`Authorizing failed, closing connection.`);
+                }
+
                 this.disconnect();
             }
         }
     }
 
     private txSend(payload: Uint8Array) {
+        if (this.debug) {
+            console.debug(`Bluetooth TX: ${bytesToHex(payload)}`);
+        }
+
         const MAX_FRAGMENT_SIZE = 508; // TODO: Detect or make configurable.
         let fragmentCount = Math.ceil(payload.length / MAX_FRAGMENT_SIZE);
         while (fragmentCount > 0) {
@@ -2559,6 +2626,10 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
             }
         });
         if (!ok) {
+            if (this.debug) {
+                console.error(`Invalid client state! required=${states}, effective=${this.state}`);
+            }
+
             throw new SIProtocolError("invalid client state");
         }
     }
