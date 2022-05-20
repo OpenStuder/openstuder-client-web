@@ -1082,7 +1082,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
     }
 
     public setDebugEnabled(enabled: boolean) {
-        if (this.debug != enabled) {
+        if (this.debug !== enabled) {
             if (enabled)
                 console.info("Debug enabled.");
             else
@@ -1575,7 +1575,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                             if (decoded.id) {
                                 this.callbacks.onDatalogRead(decoded.status, decoded.id, decoded.count, decoded.results);
                             } else {
-                                let properties = decoded.results.split("\n");
+                                let properties = decoded.results.split("\n").filter((it) => it.length > 0);
                                 this.callbacks.onDatalogPropertiesRead(decoded.status, properties);
                             }
                         }
@@ -2186,7 +2186,7 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
     }
 
     public setDebugEnabled(enabled: boolean) {
-        if (this.debug != enabled) {
+        if (this.debug !== enabled) {
             if (enabled)
                 console.info("Debug enabled.");
             else
