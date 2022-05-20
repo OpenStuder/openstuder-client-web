@@ -396,19 +396,10 @@ type SIDataLogReadWSFrameContent = {
     results: string
 }
 
-// TODO: remove.
-type SIFrameContent = {
-    accessLevel?: string,
-    gatewayVersion?: string,
-    status?: SIStatus,
-    id?: string,
-    value?: string,
-    count?: number,
-
-    body?: string,
-
-    properties?: string[]
-    messages?: SIDeviceMessage[]
+type SIMessagesReadWSFrameContent = {
+    status: SIStatus,
+    count: number,
+    messages: Array<SIDeviceMessage>
 }
 
 class SIAbstractGatewayClient {
@@ -837,7 +828,7 @@ class SIAbstractGatewayClient {
         return frame;
     }
 
-    protected static decodeMessagesReadFrame(frame: string): SIFrameContent {
+    protected static decodeMessagesReadFrame(frame: string): SIMessagesReadWSFrameContent {
         const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
         if (decodedFrame.command === "MESSAGES READ" && decodedFrame.headers.has("status") && decodedFrame.headers.has("count")) {
             const status = statusFromString(decodedFrame.headers.get("status"));
@@ -870,7 +861,7 @@ class SIAbstractGatewayClient {
         } else {
             SIProtocolError.raise("unknown error receiving messages");
         }
-        return {};
+        return {count: 0, messages: [], status: SIStatus.ERROR};
     }
 
     protected static decodeDeviceMessageFrame(frame: string): SIDeviceMessage {
@@ -1544,19 +1535,21 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         break;
                     }
 
-                    case "DEVICE MESSAGE":
-                        const message = SIGatewayClient.decodeDeviceMessageFrame(event.data);
+                    case "DEVICE MESSAGE": {
+                        const decoded = SIGatewayClient.decodeDeviceMessageFrame(event.data);
                         if (this.siGatewayCallback) {
-                            this.siGatewayCallback.onDeviceMessage(message);
+                            this.siGatewayCallback.onDeviceMessage(decoded);
                         }
                         break;
+                    }
 
-                    case "MESSAGES READ":
-                        const content = SIGatewayClient.decodeMessagesReadFrame(event.data);
-                        if (this.siGatewayCallback && content.status !== undefined && content.count !== undefined && content.messages !== undefined) {
-                            this.siGatewayCallback.onMessageRead(content.status, content.count, content.messages);
+                    case "MESSAGES READ": {
+                        const decoded = SIGatewayClient.decodeMessagesReadFrame(event.data);
+                        if (this.siGatewayCallback && decoded.status !== undefined && decoded.count !== undefined && decoded.messages !== undefined) {
+                            this.siGatewayCallback.onMessageRead(decoded.status, decoded.count, decoded.messages);
                         }
                         break;
+                    }
 
                     default:
                         SIProtocolError.raise("unsupported frame command :" + command);
@@ -1649,7 +1642,7 @@ type SIDataLogReadBTFrameContent = {
     results: Array<any>
 }
 
-type SIDMessagesReadFrameContent = {
+type SIMessagesReadBTFrameContent = {
     status: SIStatus,
     count: number,
     messages: Array<SIDeviceMessage>
@@ -1898,7 +1891,7 @@ class SIAbstractBluetoothGatewayClient {
         );
     }
 
-    protected static decodeMessagesReadFrame(frame: Uint8Array): SIDMessagesReadFrameContent {
+    protected static decodeMessagesReadFrame(frame: Uint8Array): SIMessagesReadBTFrameContent {
         const decoded = this.decodeFrame(frame);
         if (decoded.command === 0x89 && decoded.sequence.length === 3 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "number" &&
