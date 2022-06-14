@@ -1631,7 +1631,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
             console.error(`Websocket error: ${'' + event}`);
         }
 
-        this.callbacks?.onError('' + event);
+        this.callbacks?.onError(`WebSocket error`);
     };
 
     private onClose = () => {
@@ -2294,8 +2294,6 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
     /**
      * This method can be used to retrieve information about the available devices and their properties from the connected gateway. Using the optional deviceAccessId, deviceId and propertyId
      * parameters, the method can either request information about the whole topology, a particular device access instance, a device or a property.
-     *
-     * The flags control the level of detail in the gateway's response.
      *
      * The description is reported using the onDescription() method of the SIBluetoothGatewayClientCallbacks interface.
      *
