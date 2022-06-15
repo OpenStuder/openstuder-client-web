@@ -262,7 +262,7 @@ export class SIProtocolError extends Error {
 }
 
 /**
- * The SIDeviceMessage class represents a message a device connected to the OpenStuder gateway has broadcast.
+ * The SIDeviceMessage type represents a message a device connected to the OpenStuder gateway has broadcast.
  */
 export type SIDeviceMessage = {
     /**
@@ -292,7 +292,7 @@ export type SIDeviceMessage = {
 }
 
 /**
- * The SIDPropertyReadResult class represents the status of a property read result.
+ * The SIDPropertyReadResult type represents the status of a property read result.
  */
 export type SIPropertyReadResult = {
     /**
@@ -312,7 +312,7 @@ export type SIPropertyReadResult = {
 }
 
 /**
- * The SIDSubscriptionsResult class represents the status of a property subscription/unsubscription.
+ * The SIDSubscriptionsResult type represents the status of a property subscription/unsubscription.
  */
 export type SISubscriptionsResult = {
     /**
@@ -326,6 +326,66 @@ export type SISubscriptionsResult = {
     id: string
 }
 
+/**
+ * The SIExtensionStatus enum represents the status of an extension command call.
+ */
+export enum SIExtensionStatus {
+    /**
+     * Extension command was successfully executed.
+     */
+    SUCCESS = 0,
+
+    /**
+     * The extension does not exist or the currently logged user does not have the right to call the extension.
+     */
+    UNSUPPORTED_EXTENSION = - 1,
+
+    /**
+     * The command does not exist or the currently logged user does not have the right to call the command.
+     */
+    UNSUPPORTED_COMMAND = - 2,
+
+    /**
+     * A header value is missing or at least one header value is invalid (WebSocket only).
+     */
+    INVALID_HEADERS = - 3,
+
+    /**
+     * A parameter is missing or at least one parameter value is invalid (Bluetooth only).
+     */
+    INVALID_PARAMETERS = - 3,
+
+    /**
+     * The body is missing, or it's value is invalid (WebSocket only).
+     */
+    INVALID_BODY = - 4,
+
+    /**
+     * General (unspecified) error.
+     */
+    ERROR = - 5
+}
+
+function extensionStatusFromString(str?: string): SIExtensionStatus {
+    switch (str) {
+        case "Success":
+            return SIExtensionStatus.SUCCESS;
+        case "UnsupportedExtension":
+            return SIExtensionStatus.UNSUPPORTED_EXTENSION;
+        case "UnsupportedCommand":
+            return SIExtensionStatus.UNSUPPORTED_COMMAND
+        case "InvalidHeaders":
+            return SIExtensionStatus.INVALID_HEADERS;
+        case "InvalidParameters":
+            return SIExtensionStatus.INVALID_PARAMETERS;
+        case "InvalidBody":
+            return SIExtensionStatus.INVALID_BODY
+        case "Error":
+            return SIExtensionStatus.ERROR;
+        default:
+            return SIExtensionStatus.ERROR;
+    }
+}
 
 /**************************************************************************************************************************************************************
  * WebSocket client implementation.
@@ -340,7 +400,8 @@ type SIDecodedWebSocketFrame = {
 type SIAuthorizedWSFrameContent = {
     accessLevel: SIAccessLevel,
     protocolVersion: string,
-    gatewayVersion: string
+    gatewayVersion: string,
+    extensions: Array<string>
 }
 
 type SIEnumeratedWSFrameContent = {
@@ -400,6 +461,14 @@ type SIMessagesReadWSFrameContent = {
     status: SIStatus,
     count: number,
     messages: Array<SIDeviceMessage>
+}
+
+type SIExtensionCallResultWSContent = {
+    status: SIExtensionStatus,
+    extension: string,
+    command: string,
+    headers: Map<string,string>,
+    body: string
 }
 
 class SIAbstractGatewayClient {
@@ -463,7 +532,8 @@ class SIAbstractGatewayClient {
                 return {
                     accessLevel: accessLevelFromString(decodedFrame.headers.get("access_level")!),
                     protocolVersion: decodedFrame.headers.get("protocol_version")!,
-                    gatewayVersion: decodedFrame.headers.get("gateway_version")!
+                    gatewayVersion: decodedFrame.headers.get("gateway_version")!,
+                    extensions: (decodedFrame.headers.get("extensions") || "").split(',')
                 };
             } else {
                 SIProtocolError.raise("protocol version 1 not supported by server");
@@ -473,7 +543,7 @@ class SIAbstractGatewayClient {
         } else {
             SIProtocolError.raise("unknown error during authorization");
         }
-        return {accessLevel: SIAccessLevel.NONE, gatewayVersion: "", protocolVersion: ""}
+        return {accessLevel: SIAccessLevel.NONE, gatewayVersion: "", protocolVersion: "", extensions: []}
     }
 
     protected static encodeEnumerateFrame(): string {
@@ -883,6 +953,39 @@ class SIAbstractGatewayClient {
         return {accessId: "", deviceId: "", message: "", messageId: "", timestamp: new Date(0)};
     }
 
+    protected static encodeCallExtensionFrame(extension: string, command: string, parameters: Map<string,string> = new Map<string,string>(), body: string = ""): string {
+        let frame = `CALL EXTENSION\nextension:${extension}\ncommand:${command}\n`;
+        parameters.forEach((value: string, key: string) => frame += `${key}:${value}\n`);
+        frame += `\n${body || ""}`;
+        return frame;
+    }
+
+    protected static decodeExtensionsCalledFrame(frame: string): SIExtensionCallResultWSContent {
+        const decodedFrame: SIDecodedWebSocketFrame = this.decodeFrame(frame);
+        if (decodedFrame.command === "EXTENSION CALLED" && decodedFrame.headers.has("extension") &&
+            decodedFrame.headers.has("command") && decodedFrame.headers.has("status")) {
+                let extension = decodedFrame.headers.get("extension")!!;
+                let command = decodedFrame.headers.get("command")!!;
+                let status = extensionStatusFromString(decodedFrame.headers.get("status"));
+                let headers = decodedFrame.headers;
+                headers.delete("extension");
+                headers.delete("command");
+                headers.delete("status");
+                return {
+                    extension: extension,
+                    command: command,
+                    status: status,
+                    headers: headers,
+                    body: decodedFrame.body
+                };
+        } else if (decodedFrame.command === "ERROR" && decodedFrame.headers.has("reason")) {
+            SIProtocolError.raise(decodedFrame.headers.get("reason")!);
+        } else {
+            SIProtocolError.raise("unknown error receiving extension called");
+        }
+        return {body: "", command: "", extension: "", headers: new Map<string,string>(), status: SIExtensionStatus.ERROR};
+    }
+
     protected static getTimestampHeaderIfPresent(key: string, timestamp?: Date): string {
         if (timestamp) {
             return key + ':' + timestamp.toISOString() + '\n';
@@ -1048,6 +1151,17 @@ export interface SIGatewayClientCallbacks {
      * @param messages List of retrieved messages.
      */
     onMessageRead(status: SIStatus, count: number, messages: SIDeviceMessage[]): void;
+
+    /**
+     * Called when the gateway returned the status of the call extension operation using the callExtension() method.
+     *
+     * @param extension Extension that did run the command.
+     * @param command The command.
+     * @param status Status of the command run.
+     * @param parameters Key/value pairs returned by the command, see extension documentation for details.
+     * @param body Optional body (output) returned by the command, see extension documentation for details.
+     */
+    onExtensionCalled(extension: string, command: string, status: SIExtensionStatus, parameters: Map<string,string>, body: string): void;
 }
 
 /**
@@ -1060,6 +1174,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
     private state: SIConnectionState;
     private accessLevel: SIAccessLevel;
     private gatewayVersion: string;
+    private availableExtensions: Array<string>;
     private ws: WebSocket | null;
     private connectionTimeout: number = -1;
 
@@ -1076,6 +1191,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         this.ws = null;
         this.accessLevel = SIAccessLevel.NONE;
         this.gatewayVersion = '';
+        this.availableExtensions = [];
 
         this.user = undefined;
         this.password = undefined;
@@ -1157,6 +1273,14 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
      */
     public getGatewayVersion(): string {
         return this.gatewayVersion;
+    }
+
+    /**
+     * Returns the list of available protocol extensions on the connected gateway.
+     * @return List of available protocol extensions.
+     */
+    public getAvailableExtensions(): Array<string> {
+        return this.availableExtensions;
     }
 
     /**
@@ -1389,6 +1513,25 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
     }
 
     /**
+     * Runs an extension command on the gateway and returns the result of that operation. The function
+     * availableExtensions() can be user to get the list of extensions that are available on the connected gateway.
+     *
+     * The status of this operation and the command results are reported using the onExtensionCalled() method of the SIGatewayClientCallbacks interface.
+     *
+     * @param extension Extension to use.
+     * @param command Command to run on that extension.
+     * @param parameters Optional parameters (key/value) to pass to the command, see extension documentation for details.
+     * @param body Optional body to pass to the command, see extension documentation for details.
+     */
+    public callExtension(extension: string, command: string, parameters: Map<string,string> = new Map<string,string>(), body: string | undefined = undefined) {
+        // Ensure that the client is in the CONNECTED state.
+        this.ensureInState(SIConnectionState.CONNECTED);
+
+        // Encode and send LIST EXTENSIONS message to gateway.
+        this.send(SIGatewayClient.encodeCallExtensionFrame(extension, command, parameters, body));
+    }
+
+    /**
      * Disconnects the client from the gateway.
      */
     public disconnect() {
@@ -1459,6 +1602,7 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                 const decoded = SIGatewayClient.decodeAuthorizedFrame(event.data);
                 this.accessLevel = decoded.accessLevel;
                 this.gatewayVersion = decoded.gatewayVersion;
+                this.availableExtensions = decoded.extensions;
 
                 // Change state to CONNECTED.
                 this.state = SIConnectionState.CONNECTED;
@@ -1598,6 +1742,14 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
                         break;
                     }
 
+                    case "EXTENSION CALLED": {
+                        const decoded = SIGatewayClient.decodeExtensionsCalledFrame(event.data);
+                        if (this.callbacks) {
+                            this.callbacks.onExtensionCalled(decoded.extension, decoded.command, decoded.status, decoded.headers, decoded.body);
+                        }
+                        break;
+                    }
+
                     default:
                         SIProtocolError.raise("unsupported frame command :" + command);
                 }
@@ -1714,6 +1866,13 @@ type SIMessagesReadBTFrameContent = {
     status: SIStatus,
     count: number,
     messages: Array<SIDeviceMessage>
+}
+
+type SIExtensionCalledBTFrameContent = {
+    extension: string,
+    command: string,
+    status: SIExtensionStatus
+    parameters: Array<any>
 }
 
 export type SIDataLogEntry = {
@@ -2017,6 +2176,32 @@ class SIAbstractBluetoothGatewayClient {
         }
     }
 
+    protected static encodeCallExtensionFrame(extension: string, command: string, parameters: Array<any>): Uint8Array {
+        return this.join(
+            CBOR_encode(0x0B),
+            CBOR_encode(extension),
+            CBOR_encode(command),
+            ...parameters.map((it) => CBOR_encode(it))
+        );
+    }
+
+    protected static decodeExtensionCalledFrame(frame: Uint8Array): SIExtensionCalledBTFrameContent {
+        const decoded = this.decodeFrame(frame);
+        if (decoded.command === 0x8B && decoded.sequence.length >= 3 && typeof decoded.sequence[0] === "string" &&
+        typeof decoded.sequence[1] == "string" && typeof decoded.sequence[2] === "number") {
+            return {
+                extension: decoded.sequence[0],
+                command: decoded.sequence[1],
+                status: decoded.sequence[2] as SIExtensionStatus,
+                parameters: decoded.sequence.slice(3)
+            };
+        } else if (decoded.command === 0xFF && decoded.sequence.length === 1 && typeof decoded.sequence[0] === "string") {
+            throw new SIProtocolError(decoded.sequence[0]);
+        } else {
+            throw new SIProtocolError("unknown error receiving extension called message");
+        }
+    }
+
     protected static peekFrameCommand(frame: Uint8Array): number {
         return (CBOR_decodeMultiple(frame) as Array<any>)[0] as number;
     }
@@ -2151,6 +2336,16 @@ export interface SIBluetoothGatewayClientCallbacks {
      * @param messages List of retrieved messages.
      */
     onMessagesRead(status: SIStatus, count: number, messages: SIDeviceMessage[]): void;
+
+    /**
+     * Called when the gateway returned the status of the call extension operation using the callExtension() method.
+     *
+     * @param extension Extension that did run the command.
+     * @param command The command.
+     * @param status Status of the command run.
+     * @param parameters Parameters returned by the command, see extension documentation for details.
+     */
+    onExtensionCalled(extension: string, command: string, status: SIExtensionStatus, parameters: Array<any>): void;
 }
 
 export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
@@ -2164,6 +2359,7 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
     private state: SIConnectionState;
     private accessLevel: SIAccessLevel;
     private gatewayVersion: string;
+    private availableExtensions: Array<string> = [];
 
     private device: BluetoothDevice | null;
     private service: BluetoothRemoteGATTService | null;
@@ -2275,6 +2471,14 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
      */
     public getGatewayVersion(): string {
         return this.gatewayVersion;
+    }
+
+    /**
+     * Returns the list of available protocol extensions on the connected gateway.
+     * @return List of available protocol extensions.
+     */
+    public getAvailableExtensions(): Array<string> {
+        return this.availableExtensions;
     }
 
     /**
@@ -2436,6 +2640,24 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
     }
 
     /**
+     * Runs an extension command on the gateway and returns the result of that operation. The function
+     * availableExtensions() can be user to get the list of extensions that are available on the connected gateway.
+     *
+     * The status of this operation and the command results are reported using the onExtensionCalled() method of the SIBluetoothGatewayClientCallbacks interface.
+     *
+     * @param extension Extension to use.
+     * @param command Command to run on that extension.
+     * @param parameters Parameters list to pass to the command, see extension documentation for details.
+     */
+    public callExtension(extension: string, command: string, parameters: Array<any>) {
+        // Ensure that the client is in the CONNECTED state.
+        this.ensureInState(SIConnectionState.CONNECTED);
+
+        // Encode and send CALL EXTENSION message to gateway.
+        this.txSend(SIBluetoothGatewayClient.encodeCallExtensionFrame(extension, command, parameters));
+    }
+
+    /**
      * Disconnects the client from the gateway.
      */
     public disconnect = () => {
@@ -2572,6 +2794,11 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
                         this.callbacks?.onMessagesRead(decoded.status, decoded.count, decoded.messages);
                         break;
                     }
+
+                    case 0x8B: {
+                        const decoded = SIBluetoothGatewayClient.decodeExtensionCalledFrame(frame);
+                        this.callbacks?.onExtensionCalled(decoded.extension, decoded.command, decoded.status, decoded.parameters);
+                    }
                 }
             }
         } catch (error: any) {
@@ -2612,7 +2839,9 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
             fragment[0] = Math.min(fragmentCount, 255);
             fragment.set(payload.subarray(0, fragmentLength), 1);
             payload = payload.subarray(fragmentLength);
-            this.tx!.writeValueWithoutResponse(fragment);
+            this.tx!.writeValueWithoutResponse(fragment).catch((reason) => {
+                this.callbacks?.onError(reason);
+            });
         }
     }
 
