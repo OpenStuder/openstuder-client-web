@@ -1815,7 +1815,8 @@ type SIDecodedBluetoothFrame = {
 type SIAuthorizedBTFrameContent = {
     accessLevel: SIAccessLevel,
     protocolVersion: number,
-    gatewayVersion: string
+    gatewayVersion: string,
+    extensions: Array<string>
 }
 
 type SIEnumeratedBTFrameContent = {
@@ -1904,14 +1905,19 @@ class SIAbstractBluetoothGatewayClient {
 
     protected static decodeAuthorizedFrame(frame: Uint8Array): SIAuthorizedBTFrameContent {
         const decoded = this.decodeFrame(frame);
-        if (decoded.command === 0x81 && decoded.sequence.length === 3 &&
+        if (decoded.command === 0x81 && decoded.sequence.length >= 3 &&
             typeof decoded.sequence[0] === "number" && typeof decoded.sequence[1] === "number" &&
             typeof decoded.sequence[2] === "string") {
             if (decoded.sequence[1] === 1) {
+                let extensions = [];
+                if (decoded.sequence.length === 4) {
+                    extensions = decoded.sequence[3].split(',');
+                }
                 return {
                     accessLevel: decoded.sequence[0],
                     protocolVersion: decoded.sequence[1],
-                    gatewayVersion: decoded.sequence[2]
+                    gatewayVersion: decoded.sequence[2],
+                    extensions: extensions
                 }
             } else {
                 throw new SIProtocolError("protocol version 1 not supported by server")
@@ -2649,7 +2655,7 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
      * @param command Command to run on that extension.
      * @param parameters Parameters list to pass to the command, see extension documentation for details.
      */
-    public callExtension(extension: string, command: string, parameters: Array<any>) {
+    public callExtension(extension: string, command: string, parameters: Array<any> = []) {
         // Ensure that the client is in the CONNECTED state.
         this.ensureInState(SIConnectionState.CONNECTED);
 
@@ -2709,6 +2715,7 @@ export class SIBluetoothGatewayClient extends SIAbstractBluetoothGatewayClient {
                 const result = SIBluetoothGatewayClient.decodeAuthorizedFrame(frame);
                 this.accessLevel = result.accessLevel;
                 this.gatewayVersion = result.gatewayVersion;
+                this.availableExtensions = result.extensions;
 
                 this.state = SIConnectionState.CONNECTED;
                 this.callbacks?.onConnected(result.accessLevel, result.gatewayVersion);
