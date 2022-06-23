@@ -1231,6 +1231,10 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
         // Ensure that the client is in the DISCONNECTED state.
         this.ensureInState(SIConnectionState.DISCONNECTED);
 
+        if (!host.startsWith("ws://") && !host.startsWith("wss://")) {
+            host = `ws://${host}`
+        }
+
         if (this.debug) {
             console.debug(`Connecting to ${host}:${port}, user=${user || '(none)'}, password=${password || '(none)'}, connectionTimeout=${connectionTimeout}.`);
         }
@@ -1520,8 +1524,8 @@ export class SIGatewayClient extends SIAbstractGatewayClient {
      *
      * @param extension Extension to use.
      * @param command Command to run on that extension.
-     * @param parameters Optional parameters (key/value) to pass to the command, see extension documentation for details.
-     * @param body Optional body to pass to the command, see extension documentation for details.
+     * @param parameters Parameters (key/value) to pass to the command, see extension documentation for details.
+     * @param body Body to pass to the command, see extension documentation for details.
      */
     public callExtension(extension: string, command: string, parameters: Map<string,string> = new Map<string,string>(), body: string | undefined = undefined) {
         // Ensure that the client is in the CONNECTED state.
